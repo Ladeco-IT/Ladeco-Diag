@@ -1,0 +1,12 @@
+bin/
+obj/
+.vs/
+# Keep artifact folders visible across machines, but ignore heavy transient output.
+artifacts/publish/*
+!artifacts/publish/.gitkeep
+artifacts/installer/*
+!artifacts/installer/.gitkeep
+!artifacts/installer/*.exe
+logs/
+*.user
+*.suo
