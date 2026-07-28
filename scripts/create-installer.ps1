@@ -14,7 +14,11 @@ function Get-IsccPath {
 
     $candidates = @(
         "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe",
-        "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
+        "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+        "$env:ProgramFiles(x86)\Inno Setup 7\ISCC.exe",
+        "$env:ProgramFiles\Inno Setup 7\ISCC.exe",
+        "$env:ProgramFiles(x86)\Inno Setup\ISCC.exe",
+        "$env:ProgramFiles\Inno Setup\ISCC.exe"
     )
 
     foreach ($candidate in $candidates) {

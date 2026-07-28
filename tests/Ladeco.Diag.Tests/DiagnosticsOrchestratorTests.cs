@@ -1,6 +1,7 @@
 using Ladeco.Diag.Application.Abstractions;
 using Ladeco.Diag.Application.Diagnostics;
 using Ladeco.Diag.Domain.Diagnostics;
+using Xunit;
 
 namespace Ladeco.Diag.Tests;
 

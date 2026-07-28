@@ -39,8 +39,32 @@ public partial class App : System.Windows.Application
                 var appOptions = configuration.GetSection("App").Get<AppOptions>() ?? new AppOptions();
                 var storageOptions = configuration.GetSection("Storage").Get<StorageOptions>() ?? new StorageOptions();
 
+                var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                var appFolder = System.IO.Path.Combine(appData, "Ladeco", "Diag");
+                
+                // Ensure an writable absolute path for SQLite (e.g., LocalAppData) to prevent "unable to open database file" when installed in Program Files
+                var dbPath = storageOptions.SqliteConnectionString.Replace("Data Source=", "");
+                if (!System.IO.Path.IsPathRooted(dbPath))
+                {
+                    System.IO.Directory.CreateDirectory(appFolder);
+                    dbPath = System.IO.Path.Combine(appFolder, dbPath);
+                }
+                var connectionString = $"Data Source={dbPath}";
+
+                // Also ensure a writable path for PDF exports
+                var reportPath = storageOptions.ReportOutputDirectory;
+                if (!System.IO.Path.IsPathRooted(reportPath))
+                {
+                    reportPath = System.IO.Path.Combine(appFolder, reportPath);
+                }
+                var activeStorageOptions = new StorageOptions
+                {
+                    SqliteConnectionString = storageOptions.SqliteConnectionString,
+                    ReportOutputDirectory = reportPath
+                };
+
                 services.AddSingleton(appOptions);
-                services.AddSingleton(storageOptions);
+                services.AddSingleton(activeStorageOptions);
 
                 services.AddSingleton<ILocalizationService>(InMemoryLocalizationService.DutchDefaults());
                 services.AddSingleton<IThemeService, ThemeService>();
@@ -50,7 +74,7 @@ public partial class App : System.Windows.Application
                 services.AddSingleton<IReportExporter, ReportExporter>();
 
                 services.AddScoped<IDiagnosticsOrchestrator, DiagnosticsOrchestrator>();
-                services.AddInfrastructure(storageOptions.SqliteConnectionString);
+                services.AddInfrastructure(connectionString);
 
                 services.AddSingleton<MainViewModel>();
                 services.AddSingleton<MainWindow>();
@@ -62,7 +86,8 @@ public partial class App : System.Windows.Application
         using (var scope = _host.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<LadecoDiagDbContext>();
-            await db.Database.MigrateAsync();
+            // Use EnsureCreatedAsync since there are no migrations in the project
+            await db.Database.EnsureCreatedAsync();
         }
 
         var window = _host.Services.GetRequiredService<MainWindow>();

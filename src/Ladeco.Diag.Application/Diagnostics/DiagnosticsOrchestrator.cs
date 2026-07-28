@@ -20,7 +20,8 @@ public sealed class DiagnosticsOrchestrator : IDiagnosticsOrchestrator
         foreach (var module in _modules)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            moduleResults.Add(await module.ExecuteAsync(cancellationToken));
+            // Execute modules on a background thread so synchronous work (like WMI) doesn't freeze the UI 
+            moduleResults.Add(await Task.Run(() => module.ExecuteAsync(cancellationToken), cancellationToken));
         }
 
         return new ScanReport

@@ -24,6 +24,19 @@ public sealed class SystemSnapshotProvider : ISystemSnapshotProvider
         var ramUsage = ReadRamUsage();
         var storageUsage = ReadStorageUsage();
 
+        var (netType, wifiSignal) = ReadWirelessInfo();
+
+        var cpuName = ReadHardwareInfo("Win32_Processor", "Name").FirstOrDefault() ?? "Onbekende CPU";
+        var gpuName = string.Join(" | ", ReadHardwareInfo("Win32_VideoController", "Name"));
+        if (string.IsNullOrWhiteSpace(gpuName)) gpuName = "Onbekende GPU";
+
+        var totalRamBytes = ReadHardwareInfo("Win32_ComputerSystem", "TotalPhysicalMemory").FirstOrDefault();
+        var totalRamStr = "Onbekend RAM";
+        if (ulong.TryParse(totalRamBytes, out var bytes))
+        {
+            totalRamStr = $"{Math.Round(bytes / 1024.0 / 1024.0 / 1024.0, 1)} GB";
+        }
+
         return new RuntimeSnapshot(
             ComputerName: Environment.MachineName,
             UserName: Environment.UserName,
@@ -42,7 +55,67 @@ public sealed class SystemSnapshotProvider : ISystemSnapshotProvider
             InternetAvailable: NetworkInterface.GetIsNetworkAvailable(),
             DefenderStatus: ReadDefenderStatus(),
             BitLockerStatus: ReadBitLockerStatus(),
-            BatteryStatus: ReadBatteryStatus());
+            BatteryStatus: ReadBatteryStatus(),
+            NetworkType: netType,
+            WifiSignalStrength: wifiSignal,
+            NetworkSpeed: ReadNetworkSpeed(),
+            CpuName: cpuName,
+            GpuName: gpuName,
+            TotalRam: totalRamStr);
+    }
+
+    private static IEnumerable<string> ReadHardwareInfo(string wmiClass, string property)
+    {
+        var results = new List<string>();
+        try
+        {
+            using var searcher = new ManagementObjectSearcher($"SELECT {property} FROM {wmiClass}");
+            foreach (var item in searcher.Get().Cast<ManagementObject>())
+            {
+                var val = item[property]?.ToString();
+                if (!string.IsNullOrWhiteSpace(val)) results.Add(val.Trim());
+            }
+        }
+        catch { }
+        return results;
+    }
+
+    private static (string Type, string Signal) ReadWirelessInfo()
+    {
+        try
+        {
+            using var searcher = new ManagementObjectSearcher("root\\WMI", "SELECT Ndis80211ReceivedSignalStrength FROM MSNdis_80211_ReceivedSignalStrength");
+            var item = searcher.Get().Cast<ManagementObject>().FirstOrDefault();
+            if (item != null)
+            {
+                var signal = Convert.ToInt32(item["Ndis80211ReceivedSignalStrength"]);
+                var quality = signal > -50 ? "Uitstekend" : signal > -70 ? "Goed" : signal > -80 ? "Matig" : "Zwak";
+                return ("WiFi (Draadloos)", $"{signal} dBm ({quality})");
+            }
+        }
+        catch
+        {
+            // Ignored, likely not on WiFi
+        }
+
+        return ("Ethernet (Bekabeld)", "N/A");
+    }
+
+    private static string ReadNetworkSpeed()
+    {
+        try
+        {
+            var activeNet = NetworkInterface.GetAllNetworkInterfaces()
+                .FirstOrDefault(x => x.OperationalStatus == OperationalStatus.Up && x.NetworkInterfaceType != NetworkInterfaceType.Loopback);
+            
+            if (activeNet != null)
+            {
+                var mbps = activeNet.Speed / 1_000_000;
+                return mbps > 0 ? $"{mbps} Mbps (Lokale link)" : "N/A";
+            }
+        }
+        catch { }
+        return "N/A";
     }
 
     private static (string Version, string Build, string Edition) ReadOperatingSystemInfo()

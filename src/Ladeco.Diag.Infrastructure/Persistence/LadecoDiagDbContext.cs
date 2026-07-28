@@ -19,7 +19,11 @@ public sealed class LadecoDiagDbContext : DbContext
             entity.Property(x => x.ComputerName).HasMaxLength(200).IsRequired();
             entity.Property(x => x.UserName).HasMaxLength(200).IsRequired();
             entity.Property(x => x.ReportJson).IsRequired();
-            entity.Property(x => x.ScannedAt).IsRequired();
+            entity.Property(x => x.ScannedAt)
+                .HasConversion(
+                    v => v.ToUnixTimeMilliseconds(),
+                    v => DateTimeOffset.FromUnixTimeMilliseconds(v))
+                .IsRequired();
             entity.HasIndex(x => new { x.CustomerName, x.ComputerName, x.ScannedAt });
         });
     }

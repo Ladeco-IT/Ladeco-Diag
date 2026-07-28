@@ -7,7 +7,7 @@ public sealed class InMemoryLocalizationService : ILocalizationService
 {
     private readonly IReadOnlyDictionary<string, string> _translations;
 
-    public InMemoryLocalizationService(IReadOnlyDictionary<string, string> translations)
+    public InMemoryLocalizationService(IDictionary<string, string> translations)
     {
         _translations = new ReadOnlyDictionary<string, string>(translations);
     }

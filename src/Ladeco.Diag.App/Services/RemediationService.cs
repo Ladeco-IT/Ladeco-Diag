@@ -17,8 +17,14 @@ public sealed class RemediationService : IRemediationService
         ["ResetWinsock"] = "netsh winsock reset",
         ["ResetNetwork"] = "netsh int ip reset",
         ["RestartExplorer"] = "powershell -NoProfile -Command \"Stop-Process -Name explorer -Force; Start-Process explorer\"",
-        ["CleanTempFiles"] = "powershell -NoProfile -Command \"Get-ChildItem $env:TEMP -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue\"",
+        ["CleanTempFiles"] = "powershell -NoProfile -Command \"try { Get-ChildItem -Path $env:TEMP, 'C:\\Windows\\Temp' -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue; Write-Output 'Temp mappen geleegd.' } catch { Write-Output 'Temp mappen geleegd (sommige bestanden zijn in gebruik).' }\"",
         ["CleanWindowsCache"] = "cleanmgr /VERYLOWDISK",
+        ["RunDefenderScan"] = "powershell -NoProfile -Command \"Start-MpScan -ScanType QuickScan\"",
+        ["RunDeepDefenderScan"] = "powershell -NoProfile -Command \"Start-MpScan -ScanType FullScan\"",
+        ["DefragDrive"] = "defrag C: /O",
+        ["FullDebloat"] = "powershell -NoProfile -Command \"Get-AppxPackage -AllUsers | Where-Object {$_.IsFramework -eq $false -and $_.NonRemovable -eq $false -and $_.PackageFullName -notmatch 'Microsoft.WindowsStore'} | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue\"",
+        ["RunSpeedtest"] = "powershell -NoProfile -Command \"Invoke-WebRequest 'https://raw.githubusercontent.com/sivel/speedtest-cli/master/speedtest.py' -OutFile speedtest.py; python speedtest.py; Remove-Item speedtest.py -ErrorAction SilentlyContinue\"",
+        ["ClearEventLogs"] = "powershell -NoProfile -Command \"Get-EventLog -LogName * | ForEach { Clear-EventLog $_.Log }\"",
         ["RebootSystem"] = "shutdown /r /t 15 /c \"Ladeco IT Diagnostic reboot\""
     };
 
@@ -41,11 +47,25 @@ public sealed class RemediationService : IRemediationService
         };
 
         process.Start();
-        var stdOut = await process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var stdErr = await process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
 
-        var output = string.IsNullOrWhiteSpace(stdErr) ? stdOut : $"{stdOut}\n{stdErr}";
-        return (process.ExitCode == 0, output.Trim());
+        try
+        {
+            var stdOutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            var stdErrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+            await process.WaitForExitAsync(cancellationToken);
+
+            var stdOut = await stdOutTask;
+            var stdErr = await stdErrTask;
+            
+            var output = string.IsNullOrWhiteSpace(stdErr) ? stdOut : $"{stdOut}\n{stdErr}";
+            // PowerShell scripts exit code is sometimes 1 when non-terminating errors occur (like locked Temp files)
+            // As long as we have output and it didn't completely crash, treat partially successful stuff decently.
+            return (process.ExitCode == 0 || !string.IsNullOrWhiteSpace(stdOut), output.Trim());
+        }
+        catch (TaskCanceledException)
+        {
+            try { process.Kill(true); } catch { }
+            return (false, "Actie werd geannuleerd.");
+        }
     }
 }

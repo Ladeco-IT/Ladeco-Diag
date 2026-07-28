@@ -115,7 +115,7 @@ public sealed class SoftwareInventoryModule : IDiagnosticModule
             return null;
         }
 
-        if (DateTime.TryParseExact(dateText, "yyyyMMdd", null, System.Globalization.DateTimeStyles.AssumeLocal, out var parsed))
+        if (DateTime.TryParseExact(dateText, "yyyyMMdd", null, global::System.Globalization.DateTimeStyles.AssumeLocal, out var parsed))
         {
             return parsed;
         }

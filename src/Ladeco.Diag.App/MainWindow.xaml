@@ -3,18 +3,25 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:lvc="http://schemas.livecharts.com/2.0/wpf"
+        xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
         xmlns:local="clr-namespace:Ladeco.Diag.App"
+        xmlns:converters="clr-namespace:Ladeco.Diag.App.Converters"
+        xmlns:ui="http://schemas.modernwpf.com/2019"
+        ui:WindowHelper.UseModernWindowStyle="True"
         mc:Ignorable="d"
         Title="Ladeco IT Diagnostic Tool"
         Height="860"
         Width="1440"
         Background="{DynamicResource BackgroundBrush}">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <converters:InverseBooleanConverter x:Key="InverseBooleanConverter" />
+    </Window.Resources>
     <Grid Margin="18">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="220" />
+            <RowDefinition Height="260" />
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0" Background="{DynamicResource SurfaceBrush}" CornerRadius="16" Padding="18" Margin="0,0,0,16">
@@ -30,119 +37,198 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Content="{Binding RunScanLabel}" Command="{Binding RunScanCommand}" Margin="0,0,8,0" Padding="14,8" Background="{StaticResource AccentBrush}" Foreground="White" BorderThickness="0" />
-                    <Button Content="{Binding GeneratePdfLabel}" Command="{Binding GeneratePdfCommand}" Margin="0,0,8,0" Padding="14,8" />
+                    <ProgressBar IsIndeterminate="{Binding IsBusy}" Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}" Width="24" Height="24" Margin="0,0,16,0" />
+                    <Button Content="{Binding RunScanLabel}" Command="{Binding RunScanCommand}" IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}" Margin="0,0,8,0" Padding="14,8" Background="{StaticResource AccentBrush}" Foreground="White" BorderThickness="0" />
+                    <Button Content="{Binding GeneratePdfLabel}" Command="{Binding GeneratePdfCommand}" IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBooleanConverter}}" Margin="0,0,8,0" Padding="14,8" />
+                    <Button Content="Open PDF" Command="{Binding OpenPdfCommand}" Visibility="{Binding CanOpenPdf, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="0,0,8,0" Padding="14,8" />
                     <Button Content="Light" Command="{Binding LightThemeCommand}" Margin="0,0,8,0" Padding="10,8" />
                     <Button Content="Dark" Command="{Binding DarkThemeCommand}" Padding="10,8" />
                 </StackPanel>
             </Grid>
         </Border>
 
-        <Grid Grid.Row="1">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="2*" />
-                <ColumnDefinition Width="3*" />
-            </Grid.ColumnDefinitions>
-
-            <Border Grid.Column="0" Background="{DynamicResource SurfaceBrush}" CornerRadius="16" Padding="16" Margin="0,0,12,0">
-                <StackPanel>
-                    <TextBlock Text="Realtime Systeemoverzicht" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
-                    <UniformGrid Columns="2" Rows="10">
-                        <TextBlock Text="Computer" Foreground="{DynamicResource TextSecondaryBrush}" />
-                        <TextBlock Text="{Binding ComputerName}" Foreground="{DynamicResource TextPrimaryBrush}" />
-                        <TextBlock Text="Gebruiker" Foreground="{DynamicResource TextSecondaryBrush}" />
-                        <TextBlock Text="{Binding UserName}" Foreground="{DynamicResource TextPrimaryBrush}" />
-                        <TextBlock Text="Windows versie" Foreground="{DynamicResource TextSecondaryBrush}" />
-                        <TextBlock Text="{Binding WindowsVersion}" Foreground="{DynamicResource TextPrimaryBrush}" />
-                        <TextBlock Text="Build" Foreground="{DynamicResource TextSecondaryBrush}" />
-                        <TextBlock Text="{Binding WindowsBuild}" Foreground="{DynamicResource TextPrimaryBrush}" />
-                        <TextBlock Text="Editie" Foreground="{DynamicResource TextSecondaryBrush}" />
-                        <TextBlock Text="{Binding WindowsEdition}" Foreground="{DynamicResource TextPrimaryBrush}" />
-                        <TextBlock Text="Laatste update" Foreground="{DynamicResource TextSecondaryBrush}" />
-                        <TextBlock Text="{Binding LastUpdateDisplay}" Foreground="{DynamicResource TextPrimaryBrush}" />
-                        <TextBlock Text="IP" Foreground="{DynamicResource TextSecondaryBrush}" />
-                        <TextBlock Text="{Binding IpAddress}" Foreground="{DynamicResource TextPrimaryBrush}" />
-                        <TextBlock Text="Publiek IP" Foreground="{DynamicResource TextSecondaryBrush}" />
-                        <TextBlock Text="{Binding PublicIpAddress}" Foreground="{DynamicResource TextPrimaryBrush}" />
-                        <TextBlock Text="MAC" Foreground="{DynamicResource TextSecondaryBrush}" />
-                        <TextBlock Text="{Binding MacAddress}" Foreground="{DynamicResource TextPrimaryBrush}" />
-                        <TextBlock Text="Uptime" Foreground="{DynamicResource TextSecondaryBrush}" />
-                        <TextBlock Text="{Binding Uptime}" Foreground="{DynamicResource TextPrimaryBrush}" />
-                        <TextBlock Text="CPU" Foreground="{DynamicResource TextSecondaryBrush}" />
-                        <TextBlock Text="{Binding CpuUsageDisplay}" Foreground="{DynamicResource TextPrimaryBrush}" />
-                        <TextBlock Text="RAM" Foreground="{DynamicResource TextSecondaryBrush}" />
-                        <TextBlock Text="{Binding RamUsageDisplay}" Foreground="{DynamicResource TextPrimaryBrush}" />
-                        <TextBlock Text="Opslag" Foreground="{DynamicResource TextSecondaryBrush}" />
-                        <TextBlock Text="{Binding StorageUsageDisplay}" Foreground="{DynamicResource TextPrimaryBrush}" />
-                        <TextBlock Text="CPU temp" Foreground="{DynamicResource TextSecondaryBrush}" />
-                        <TextBlock Text="{Binding CpuTemperatureDisplay}" Foreground="{DynamicResource TextPrimaryBrush}" />
-                        <TextBlock Text="Internet" Foreground="{DynamicResource TextSecondaryBrush}" />
-                        <TextBlock Text="{Binding InternetStatus}" Foreground="{DynamicResource TextPrimaryBrush}" />
-                        <TextBlock Text="Defender" Foreground="{DynamicResource TextSecondaryBrush}" />
-                        <TextBlock Text="{Binding DefenderStatus}" Foreground="{DynamicResource TextPrimaryBrush}" />
-                        <TextBlock Text="BitLocker" Foreground="{DynamicResource TextSecondaryBrush}" />
-                        <TextBlock Text="{Binding BitLockerStatus}" Foreground="{DynamicResource TextPrimaryBrush}" />
-                        <TextBlock Text="Batterij" Foreground="{DynamicResource TextSecondaryBrush}" />
-                        <TextBlock Text="{Binding BatteryStatus}" Foreground="{DynamicResource TextPrimaryBrush}" />
-                    </UniformGrid>
-                    <TextBlock Text="{Binding RecentScanSummary}" Margin="0,10,0,0" TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" />
-                </StackPanel>
-            </Border>
-
-            <Border Grid.Column="1" Background="{DynamicResource SurfaceBrush}" CornerRadius="16" Padding="16">
+        <TabControl Grid.Row="1" Margin="0,0,0,0" Padding="0,16,0,0" Background="Transparent" BorderThickness="0">
+            <TabItem Header="Overzicht" FontSize="16">
                 <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="200" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2*" />
+                        <ColumnDefinition Width="3*" />
+                    </Grid.ColumnDefinitions>
 
-                    <TextBlock Text="Diagnostiek" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                    <Border Grid.Column="0" Background="{DynamicResource SurfaceBrush}" CornerRadius="16" Padding="16" Margin="0,0,12,0">
+                        <StackPanel>
+                            <TextBlock Text="Realtime Systeemoverzicht" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10" />
+                            <UniformGrid Columns="2" Rows="16">
+                                <TextBlock Text="Cpu" Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <TextBlock Text="{Binding CpuName}" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <TextBlock Text="Gpu" Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <TextBlock Text="{Binding GpuName}" TextTrimming="CharacterEllipsis" ToolTip="{Binding GpuName}" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <TextBlock Text="Total RAM" Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <TextBlock Text="{Binding TotalRam}" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <TextBlock Text="Computer" Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <TextBlock Text="{Binding ComputerName}" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <TextBlock Text="Gebruiker" Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <TextBlock Text="{Binding UserName}" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <TextBlock Text="Windows versie" Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <TextBlock Text="{Binding WindowsVersion}" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <TextBlock Text="Build" Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <TextBlock Text="{Binding WindowsBuild}" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <TextBlock Text="Editie" Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <TextBlock Text="{Binding WindowsEdition}" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <TextBlock Text="Laatste update" Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <TextBlock Text="{Binding LastUpdateDisplay}" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <TextBlock Text="IP" Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <TextBlock Text="{Binding IpAddress}" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <TextBlock Text="Publiek IP" Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <TextBlock Text="{Binding PublicIpAddress}" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <TextBlock Text="MAC" Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <TextBlock Text="{Binding MacAddress}" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <TextBlock Text="Uptime" Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <TextBlock Text="{Binding Uptime}" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <TextBlock Text="CPU belasting" Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <TextBlock Text="{Binding CpuUsageDisplay}" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <TextBlock Text="RAM gebruik" Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <TextBlock Text="{Binding RamUsageDisplay}" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <TextBlock Text="Opslag vrij" Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <TextBlock Text="{Binding StorageUsageDisplay}" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <TextBlock Text="CPU temp" Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <TextBlock Text="{Binding CpuTemperatureDisplay}" Foreground="{DynamicResource TextPrimaryBrush}" />
+                            </UniformGrid>
+                            <TextBlock Text="{Binding RecentScanSummary}" Margin="0,10,0,0" TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" />
+                        </StackPanel>
+                    </Border>
 
-                    <lvc:CartesianChart Grid.Row="1" Series="{Binding ResourceSeries}" XAxes="{Binding XAxes}" YAxes="{Binding YAxes}" />
+                    <Border Grid.Column="1" Background="{DynamicResource SurfaceBrush}" CornerRadius="16" Padding="16">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="200" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
 
-                    <DataGrid Grid.Row="2"
-                              Margin="0,12,0,0"
-                              ItemsSource="{Binding Findings}"
-                              AutoGenerateColumns="False"
-                              IsReadOnly="True"
-                              HeadersVisibility="Column"
-                              GridLinesVisibility="Horizontal"
-                              BorderThickness="0">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Titel" Binding="{Binding Title}" Width="*" />
-                            <DataGridTextColumn Header="Severity" Binding="{Binding Severity}" Width="100" />
-                            <DataGridTextColumn Header="Prioriteit" Binding="{Binding Priority}" Width="90" />
-                            <DataGridTextColumn Header="Oorzaak" Binding="{Binding Cause}" Width="2*" />
-                            <DataGridTextColumn Header="Oplossing" Binding="{Binding Resolution}" Width="2*" />
-                        </DataGrid.Columns>
-                    </DataGrid>
+                            <TextBlock Text="Diagnostiek" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+
+                            <lvc:CartesianChart Grid.Row="1" Series="{Binding ResourceSeries}" XAxes="{Binding XAxes}" YAxes="{Binding YAxes}" />
+
+                            <DataGrid Grid.Row="2"
+                                      Margin="0,12,0,0"
+                                      ItemsSource="{Binding Findings}"
+                                      AutoGenerateColumns="False"
+                                      IsReadOnly="True"
+                                      HeadersVisibility="Column"
+                                      GridLinesVisibility="Horizontal"
+                                      BorderThickness="0">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Titel" Binding="{Binding Title}" Width="*" />
+                                    <DataGridTextColumn Header="Severity" Binding="{Binding Severity}" Width="100" />
+                                    <DataGridTextColumn Header="Prioriteit" Binding="{Binding Priority}" Width="90" />
+                                    <DataGridTextColumn Header="Oorzaak" Binding="{Binding Cause}" Width="2*" />
+                                    <DataGridTextColumn Header="Oplossing" Binding="{Binding Resolution}" Width="2*" />
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Grid>
+                    </Border>
                 </Grid>
-            </Border>
-        </Grid>
+            </TabItem>
+
+            <TabItem Header="Netwerk" FontSize="16">
+                <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="16" Padding="16">
+                    <StackPanel>
+                        <TextBlock Text="Uitgebreide Netwerk Informatie" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,20" />
+                        
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="200" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Internet Status:" Margin="0,0,0,10" Foreground="{DynamicResource TextSecondaryBrush}" />
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding InternetStatus}" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" />
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Type netwerk:" Margin="0,0,0,10" Foreground="{DynamicResource TextSecondaryBrush}" />
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding NetworkType}" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" />
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="WiFi signaal:" Margin="0,0,0,10" Foreground="{DynamicResource TextSecondaryBrush}" />
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding WifiSignalStrength}" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" />
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Lokale link snelheid:" Margin="0,0,0,10" Foreground="{DynamicResource TextSecondaryBrush}" />
+                            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding NetworkSpeed}" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" />
+
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Lokaal IPv4:" Margin="0,0,0,10" Foreground="{DynamicResource TextSecondaryBrush}" />
+                            <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding IpAddress}" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" />
+
+                            <TextBlock Grid.Row="5" Grid.Column="0" Text="Publiek IPv4:" Margin="0,0,0,10" Foreground="{DynamicResource TextSecondaryBrush}" />
+                            <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding PublicIpAddress}" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </TabItem>
+        </TabControl>
 
         <Border Grid.Row="2" Background="{DynamicResource SurfaceBrush}" CornerRadius="16" Padding="16" Margin="0,12,0,0">
             <StackPanel>
                 <TextBlock Text="Herstelacties" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,8" />
                 <WrapPanel>
-                    <Button Content="Flush DNS" Command="{Binding FlushDnsCommand}" Margin="0,0,8,8" Padding="10,6" />
-                    <Button Content="IP Renew" Command="{Binding RenewIpCommand}" Margin="0,0,8,8" Padding="10,6" />
-                    <Button Content="DNS Reset" Command="{Binding DnsResetCommand}" Margin="0,0,8,8" Padding="10,6" />
-                    <Button Content="DISM" Command="{Binding DismCommand}" Margin="0,0,8,8" Padding="10,6" />
-                    <Button Content="SFC" Command="{Binding SfcCommand}" Margin="0,0,8,8" Padding="10,6" />
-                    <Button Content="CHKDSK" Command="{Binding ChkdskCommand}" Margin="0,0,8,8" Padding="10,6" />
-                    <Button Content="Reset Windows Update" Command="{Binding ResetWindowsUpdateCommand}" Margin="0,0,8,8" Padding="10,6" />
-                    <Button Content="Restart Spooler" Command="{Binding RestartSpoolerCommand}" Margin="0,0,8,8" Padding="10,6" />
-                    <Button Content="Winsock Reset" Command="{Binding WinsockCommand}" Margin="0,0,8,8" Padding="10,6" />
-                    <Button Content="Netwerk Reset" Command="{Binding NetworkResetCommand}" Margin="0,0,8,8" Padding="10,6" />
-                    <Button Content="Restart Explorer" Command="{Binding RestartExplorerCommand}" Margin="0,0,8,8" Padding="10,6" />
-                    <Button Content="Clean Temp" Command="{Binding CleanTempFilesCommand}" Margin="0,0,8,8" Padding="10,6" />
-                    <Button Content="Clean Cache" Command="{Binding CleanWindowsCacheCommand}" Margin="0,0,8,8" Padding="10,6" />
-                    <Button Content="Reboot" Command="{Binding RebootSystemCommand}" Margin="0,0,8,8" Padding="10,6" />
+                    <Button Content="Flush DNS" Command="{Binding FlushDnsCommand}" IsEnabled="{Binding IsActionRunning, Converter={StaticResource InverseBooleanConverter}}" Margin="0,0,8,8" Padding="10,6" />
+                    <Button Content="IP Renew" Command="{Binding RenewIpCommand}" IsEnabled="{Binding IsActionRunning, Converter={StaticResource InverseBooleanConverter}}" Margin="0,0,8,8" Padding="10,6" />
+                    <Button Content="DNS Reset" Command="{Binding DnsResetCommand}" IsEnabled="{Binding IsActionRunning, Converter={StaticResource InverseBooleanConverter}}" Margin="0,0,8,8" Padding="10,6" />
+                    <Button Content="DISM" Command="{Binding DismCommand}" IsEnabled="{Binding IsActionRunning, Converter={StaticResource InverseBooleanConverter}}" Margin="0,0,8,8" Padding="10,6" />
+                    <Button Content="SFC" Command="{Binding SfcCommand}" IsEnabled="{Binding IsActionRunning, Converter={StaticResource InverseBooleanConverter}}" Margin="0,0,8,8" Padding="10,6" />
+                    <Button Content="CHKDSK" Command="{Binding ChkdskCommand}" IsEnabled="{Binding IsActionRunning, Converter={StaticResource InverseBooleanConverter}}" Margin="0,0,8,8" Padding="10,6" />
+                    <Button Content="Reset Windows Update" Command="{Binding ResetWindowsUpdateCommand}" IsEnabled="{Binding IsActionRunning, Converter={StaticResource InverseBooleanConverter}}" Margin="0,0,8,8" Padding="10,6" />
+                    <Button Content="Restart Spooler" Command="{Binding RestartSpoolerCommand}" IsEnabled="{Binding IsActionRunning, Converter={StaticResource InverseBooleanConverter}}" Margin="0,0,8,8" Padding="10,6" />
+                    <Button Content="Winsock Reset" Command="{Binding WinsockCommand}" IsEnabled="{Binding IsActionRunning, Converter={StaticResource InverseBooleanConverter}}" Margin="0,0,8,8" Padding="10,6" />
+                    <Button Content="Netwerk Reset" Command="{Binding NetworkResetCommand}" IsEnabled="{Binding IsActionRunning, Converter={StaticResource InverseBooleanConverter}}" Margin="0,0,8,8" Padding="10,6" />
+                    <Button Content="Restart Explorer" Command="{Binding RestartExplorerCommand}" IsEnabled="{Binding IsActionRunning, Converter={StaticResource InverseBooleanConverter}}" Margin="0,0,8,8" Padding="10,6" />
+                    <Button Content="Clean Temp" Command="{Binding CleanTempFilesCommand}" IsEnabled="{Binding IsActionRunning, Converter={StaticResource InverseBooleanConverter}}" Margin="0,0,8,8" Padding="10,6" />
+                    <Button Content="Clean Cache" Command="{Binding CleanWindowsCacheCommand}" IsEnabled="{Binding IsActionRunning, Converter={StaticResource InverseBooleanConverter}}" Margin="0,0,8,8" Padding="10,6" />
+                    <Button Content="Win Defender Scan" Command="{Binding RunDefenderScanCommand}" IsEnabled="{Binding IsActionRunning, Converter={StaticResource InverseBooleanConverter}}" Margin="0,0,8,8" Padding="10,6" Background="{DynamicResource SystemControlErrorTextForegroundBrush}" Foreground="White" />
+                    <Button Content="Diepe Antivirus Scan" Command="{Binding RunDeepDefenderScanCommand}" IsEnabled="{Binding IsActionRunning, Converter={StaticResource InverseBooleanConverter}}" Margin="0,0,8,8" Padding="10,6" Background="{DynamicResource SystemControlErrorTextForegroundBrush}" Foreground="White" />
+                    <Button Content="Wis Systeem Logs" Command="{Binding ClearEventLogsCommand}" IsEnabled="{Binding IsActionRunning, Converter={StaticResource InverseBooleanConverter}}" Margin="0,0,8,8" Padding="10,6" />
+                    <Button Content="Defrag/Optimize" Command="{Binding DefragDriveCommand}" IsEnabled="{Binding IsActionRunning, Converter={StaticResource InverseBooleanConverter}}" Margin="0,0,8,8" Padding="10,6" />
+                    <Button Content="Full Debloat" Command="{Binding FullDebloatCommand}" IsEnabled="{Binding IsActionRunning, Converter={StaticResource InverseBooleanConverter}}" Margin="0,0,8,8" Padding="10,6" />
+                    <Button Content="Test Internet Snelheid" Command="{Binding RunSpeedtestCommand}" IsEnabled="{Binding IsActionRunning, Converter={StaticResource InverseBooleanConverter}}" Margin="0,0,8,8" Padding="10,6" Background="{StaticResource AccentBrush}" Foreground="White" />
+                    <Button Content="Reboot" Command="{Binding RebootSystemCommand}" IsEnabled="{Binding IsActionRunning, Converter={StaticResource InverseBooleanConverter}}" Margin="0,0,8,8" Padding="10,6" />
                 </WrapPanel>
-                <TextBlock Text="{Binding ActionOutput}" Margin="0,8,0,0" TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}" />
-                <TextBlock Text="{Binding AiAssistantSummary}" Margin="0,10,0,0" TextWrapping="Wrap" Foreground="{DynamicResource TextPrimaryBrush}" />
+
+                <ScrollViewer MaxHeight="90" VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                    <TextBlock Text="{Binding AiAssistantSummary}" TextWrapping="Wrap" FontSize="14" Foreground="{DynamicResource TextPrimaryBrush}" />
+                </ScrollViewer>
             </StackPanel>
+        </Border>
+
+        <!-- Progress/Terminal Popup Overlay -->
+        <Border Grid.RowSpan="3" Background="#AA000000" Visibility="{Binding IsActionRunning, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="16" Padding="20" HorizontalAlignment="Center" VerticalAlignment="Center" Width="800" MaxHeight="600">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                        <ProgressBar IsIndeterminate="True" Width="24" Height="24" Margin="0,0,10,0" />
+                        <TextBlock Text="{Binding CurrentActionName}" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                    </StackPanel>
+                    
+                    <Border Grid.Row="1" Background="#1E1E1E" CornerRadius="8" Padding="10">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <TextBlock Text="{Binding ActionOutput}" FontFamily="Consolas" Foreground="#CCCCCC" TextWrapping="Wrap" />
+                        </ScrollViewer>
+                    </Border>
+                    
+                    <Button Grid.Row="2" Content="Stop Actie" Command="{Binding CancelActionCommand}" Margin="0,16,0,0" Padding="16,8" HorizontalAlignment="Right" Foreground="White" Background="{DynamicResource SystemControlErrorTextForegroundBrush}" BorderThickness="0" />
+                </Grid>
+            </Border>
         </Border>
     </Grid>
 </Window>

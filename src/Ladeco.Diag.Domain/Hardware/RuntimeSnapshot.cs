@@ -18,5 +18,11 @@ public sealed record RuntimeSnapshot(
     bool InternetAvailable,
     string DefenderStatus,
     string BitLockerStatus,
-    string BatteryStatus
+    string BatteryStatus,
+    string NetworkType,
+    string WifiSignalStrength,
+    string NetworkSpeed,
+    string CpuName,
+    string GpuName,
+    string TotalRam
 );

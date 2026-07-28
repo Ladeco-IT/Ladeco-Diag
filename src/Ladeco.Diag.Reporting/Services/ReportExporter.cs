@@ -107,18 +107,18 @@ public sealed class ReportExporter : IReportExporter
         var rows = string.Join(Environment.NewLine, report.AllFindings.OrderByDescending(x => x.Priority).Select(x =>
             $"<tr><td>{x.Code}</td><td>{Escape(x.Title)}</td><td>{x.Severity}</td><td>{x.Priority}</td><td>{Escape(x.ProbableCause)}</td><td>{Escape(x.Resolution)}</td></tr>"));
 
-        var html = $"""
+        var html = $$"""
 <!doctype html>
-<html lang=\"nl\">
+<html lang="nl">
 <head>
-  <meta charset=\"utf-8\" />
+  <meta charset="utf-8" />
   <title>Ladeco IT Rapport</title>
   <style>
-    body {{ font-family: 'Segoe UI', sans-serif; margin: 24px; color: #1f2937; }}
-    h1 {{ color: #0066FF; }}
-    table {{ width: 100%; border-collapse: collapse; margin-top: 16px; }}
-    th, td {{ border: 1px solid #d1d5db; padding: 8px; text-align: left; }}
-    th {{ background: #f9fafb; }}
+    body { font-family: 'Segoe UI', sans-serif; margin: 24px; color: #1f2937; }
+    h1 { color: #0066FF; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+    th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; }
+    th { background: #f9fafb; }
   </style>
 </head>
 <body>

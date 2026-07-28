@@ -3,6 +3,7 @@ using Ladeco.Diag.Infrastructure.Diagnostics;
 using Ladeco.Diag.Infrastructure.Persistence;
 using Ladeco.Diag.Infrastructure.System;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Ladeco.Diag.Infrastructure.Extensions;
@@ -11,7 +12,11 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, string sqliteConnectionString)
     {
-        services.AddDbContext<LadecoDiagDbContext>(options => options.UseSqlite(sqliteConnectionString));
+        services.AddDbContext<LadecoDiagDbContext>(options => 
+        {
+            options.UseSqlite(sqliteConnectionString);
+            options.ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning));
+        });
 
         services.AddSingleton<ISystemSnapshotProvider, SystemSnapshotProvider>();
         services.AddSingleton<IHardwareInventoryProvider, HardwareInventoryProvider>();

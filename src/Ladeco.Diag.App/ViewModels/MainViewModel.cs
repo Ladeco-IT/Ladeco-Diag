@@ -77,7 +77,12 @@ public partial class MainViewModel : ObservableObject
         XAxes = [new Axis { Name = "Samples" }];
         YAxes = [new Axis { Name = "%", MinLimit = 0, MaxLimit = 100 }];
 
-        _ = RefreshRuntimeSnapshotAsync();
+        IsBusy = true;
+        _ = Task.Run(async () =>
+        {
+            await RefreshRuntimeSnapshotAsync();
+            System.Windows.Application.Current.Dispatcher.Invoke(() => IsBusy = false);
+        });
     }
 
     public ObservableCollection<FindingItem> Findings { get; }
@@ -109,45 +114,71 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string defenderStatus = "-";
     [ObservableProperty] private string bitLockerStatus = "-";
     [ObservableProperty] private string batteryStatus = "-";
+    [ObservableProperty] private string networkType = "-";
+    [ObservableProperty] private string wifiSignalStrength = "-";
+    [ObservableProperty] private string networkSpeed = "-";
+    [ObservableProperty] private string cpuName = "-";
+    [ObservableProperty] private string gpuName = "-";
+    [ObservableProperty] private string totalRam = "-";
     [ObservableProperty] private string recentScanSummary = string.Empty;
     [ObservableProperty] private string aiAssistantSummary = string.Empty;
+    [ObservableProperty] private bool isBusy = false;
+    [ObservableProperty] private bool isActionRunning = false;
+    [ObservableProperty] private string lastPdfPath = string.Empty;
+    [ObservableProperty] private bool canOpenPdf = false;
+    [ObservableProperty] private string currentActionName = string.Empty;
+    
+    private CancellationTokenSource? _actionCts;
 
     [RelayCommand]
     private async Task RunScanAsync()
     {
-        StatusText = _localization["Dashboard.Status.Scanning"];
+        if (IsBusy) return;
+        IsBusy = true;
+        StatusText = _localization["Dashboard.Status.Scanning"] + "... (Even geduld a.u.b.)";
         Findings.Clear();
 
-        _latestReport = await _orchestrator.RunFullScanAsync();
-
-        foreach (var finding in _latestReport.AllFindings.OrderByDescending(x => x.Priority))
+        try
         {
-            Findings.Add(new FindingItem(
-                finding.Title,
-                finding.Severity.ToString(),
-                finding.ProbableCause,
-                finding.Resolution,
-                finding.Difficulty,
-                finding.Priority,
-                finding.AutoFixAvailable,
-                finding.AutoFixCommand));
+            _latestReport = await Task.Run(() => _orchestrator.RunFullScanAsync());
+
+            foreach (var finding in _latestReport.AllFindings.OrderByDescending(x => x.Priority))
+            {
+                Findings.Add(new FindingItem(
+                    finding.Title,
+                    finding.Severity.ToString(),
+                    finding.ProbableCause,
+                    finding.Resolution,
+                    finding.Difficulty,
+                    finding.Priority,
+                    finding.AutoFixAvailable,
+                    finding.AutoFixCommand));
+            }
+
+            var topFinding = _latestReport.AllFindings.OrderByDescending(x => x.Priority).FirstOrDefault();
+            AiAssistantSummary = topFinding is null
+                ? _localization["AI.NoCritical"]
+                : _findingExplanationService.BuildExplanation(topFinding);
+
+            await _scanHistoryRepository.SaveAsync(_appOptions.DefaultCustomerName, _latestReport);
+            var history = await _scanHistoryRepository.SearchAsync(_appOptions.DefaultCustomerName, _latestReport.ComputerName, take: 1);
+            var latest = history.FirstOrDefault();
+            if (latest is not null)
+            {
+                RecentScanSummary = $"Laatste scan: {latest.ScannedAt:dd/MM/yyyy HH:mm} | Issues: {latest.FindingCount} | Hoog/Kritiek: {latest.HighPriorityFindingCount}";
+            }
+
+            StatusText = _localization["Dashboard.Status.Completed"];
         }
-
-        var topFinding = _latestReport.AllFindings.OrderByDescending(x => x.Priority).FirstOrDefault();
-        AiAssistantSummary = topFinding is null
-            ? _localization["AI.NoCritical"]
-            : _findingExplanationService.BuildExplanation(topFinding);
-
-        await _scanHistoryRepository.SaveAsync(_appOptions.DefaultCustomerName, _latestReport);
-        var history = await _scanHistoryRepository.SearchAsync(_appOptions.DefaultCustomerName, _latestReport.ComputerName, take: 1);
-        var latest = history.FirstOrDefault();
-        if (latest is not null)
+        catch (Exception ex)
         {
-            RecentScanSummary = $"Laatste scan: {latest.ScannedAt:dd/MM/yyyy HH:mm} | Issues: {latest.FindingCount} | Hoog/Kritiek: {latest.HighPriorityFindingCount}";
+            StatusText = "Er is een fout opgetreden: " + ex.Message;
         }
-
-        StatusText = _localization["Dashboard.Status.Completed"];
-        await RefreshRuntimeSnapshotAsync();
+        finally
+        {
+            await RefreshRuntimeSnapshotAsync();
+            IsBusy = false;
+        }
     }
 
     [RelayCommand]
@@ -169,7 +200,23 @@ public partial class MainViewModel : ObservableObject
         _ = await _reportExporter.ExportCsvAsync(_latestReport, _storageOptions.ReportOutputDirectory);
         _ = await _reportExporter.ExportHtmlAsync(_latestReport, _appOptions.DefaultCustomerName, _appOptions.DefaultTechnicianName, _storageOptions.ReportOutputDirectory);
 
-        ActionOutput = $"Rapporten opgeslagen in: {Path.GetFullPath(_storageOptions.ReportOutputDirectory)} (PDF: {Path.GetFileName(path)})";
+        LastPdfPath = System.IO.Path.GetFullPath(path);
+        CanOpenPdf = true;
+
+        ActionOutput = $"Rapporten opgeslagen in: {System.IO.Path.GetFullPath(_storageOptions.ReportOutputDirectory)} (PDF: {System.IO.Path.GetFileName(path)})";
+    }
+
+    [RelayCommand]
+    private void OpenPdf()
+    {
+        if (!string.IsNullOrEmpty(LastPdfPath) && System.IO.File.Exists(LastPdfPath))
+        {
+            var p = new System.Diagnostics.Process
+            {
+                StartInfo = new System.Diagnostics.ProcessStartInfo(LastPdfPath) { UseShellExecute = true }
+            };
+            p.Start();
+        }
     }
 
     [RelayCommand]
@@ -218,7 +265,34 @@ public partial class MainViewModel : ObservableObject
     private Task CleanWindowsCacheAsync() => ExecuteRemediationAsync("CleanWindowsCache", _localization["Action.CleanCache"]);
 
     [RelayCommand]
+    private Task RunDeepDefenderScanAsync() => ExecuteRemediationAsync("RunDeepDefenderScan", "Weet u zeker dat u een volledige malware/virus scan wilt uitvoeren? (Dit kan lang duren)");
+
+    [RelayCommand]
+    private Task RunDefenderScanAsync() => ExecuteRemediationAsync("RunDefenderScan", "Weet u zeker dat u een quick scan van Windows Defender wilt starten?");
+
+    [RelayCommand]
+    private Task ClearEventLogsAsync() => ExecuteRemediationAsync("ClearEventLogs", "Dit wist alle Windows Event Viewer logs. Doorgaan?");
+
+    [RelayCommand]
+    private Task DefragDriveAsync() => ExecuteRemediationAsync("DefragDrive", "Weet u zeker dat u de systeemschijf wilt optimaliseren/defragmenteren?");
+
+    [RelayCommand]
+    private Task FullDebloatAsync() => ExecuteRemediationAsync("FullDebloat", "Waarschuwing: Hiermee worden alle bloatware en voorgeïnstalleerde Windows apps (behalve essentials) verwijderd. Doorgaan?");
+
+    [RelayCommand]
+    private Task RunSpeedtestAsync() => ExecuteRemediationAsync("RunSpeedtest", "Wil je een speedtest starten? Dit kan enkele seconden duren.");
+
+    [RelayCommand]
     private Task RebootSystemAsync() => ExecuteRemediationAsync("RebootSystem", _localization["Action.Reboot"]);
+
+    [RelayCommand]
+    private void CancelAction()
+    {
+        if (_actionCts != null && !_actionCts.IsCancellationRequested)
+        {
+            _actionCts.Cancel();
+        }
+    }
 
     private async Task ExecuteRemediationAsync(string actionKey, string confirmationText)
     {
@@ -227,8 +301,31 @@ public partial class MainViewModel : ObservableObject
             return;
         }
 
-        var (success, output) = await _remediationService.RunSafeActionAsync(actionKey);
-        ActionOutput = success ? $"{_localization["Action.Success"]}: {output}" : $"{_localization["Action.Failed"]}: {output}";
+        CurrentActionName = $"Actie '{actionKey}' wordt uitgevoerd...";
+        IsActionRunning = true;
+        ActionOutput = $"Laden van PowerShell/Command module voor {actionKey}...";
+        
+        _actionCts = new CancellationTokenSource();
+        
+        try
+        {
+            var (success, output) = await Task.Run(() => _remediationService.RunSafeActionAsync(actionKey, _actionCts.Token), _actionCts.Token);
+            ActionOutput = success ? $"{_localization["Action.Success"]}:\n{output}" : $"{_localization["Action.Failed"]}:\n{output}";
+        }
+        catch (OperationCanceledException)
+        {
+             ActionOutput = "Actie werd afgebroken door de gebruiker.";
+        }
+        catch (Exception ex)
+        {
+             ActionOutput = $"Fout: {ex.Message}";
+        }
+        finally
+        {
+             IsActionRunning = false;
+             _actionCts.Dispose();
+             _actionCts = null;
+        }
     }
 
     private async Task RefreshRuntimeSnapshotAsync()
@@ -253,6 +350,12 @@ public partial class MainViewModel : ObservableObject
         DefenderStatus = snapshot.DefenderStatus;
         BitLockerStatus = snapshot.BitLockerStatus;
         BatteryStatus = snapshot.BatteryStatus;
+        NetworkType = snapshot.NetworkType;
+        WifiSignalStrength = snapshot.WifiSignalStrength;
+        NetworkSpeed = snapshot.NetworkSpeed;
+        CpuName = snapshot.CpuName;
+        GpuName = snapshot.GpuName;
+        TotalRam = snapshot.TotalRam;
 
         AppendSample(0, snapshot.CpuUsagePercent);
         AppendSample(1, snapshot.RamUsagePercent);

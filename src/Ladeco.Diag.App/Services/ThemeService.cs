@@ -10,7 +10,7 @@ public sealed class ThemeService : IThemeService
 
     private static void Apply(string source)
     {
-        var app = Application.Current;
+        var app = System.Windows.Application.Current;
         if (app is null)
         {
             return;
