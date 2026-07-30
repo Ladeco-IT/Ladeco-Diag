@@ -27,6 +27,7 @@ WizardStyle=modern
 OutputDir={#OutputDir}
 OutputBaseFilename=LadecoDiagSetup_{#MyAppVersion}
 UninstallDisplayIcon={app}\LadecoDiag.exe
+SetupIconFile=..\..\src\Ladeco.Diag.App\Resources\Images\Logo.ico
 
 [Languages]
 Name: "dutch"; MessagesFile: "compiler:Languages\Dutch.isl"

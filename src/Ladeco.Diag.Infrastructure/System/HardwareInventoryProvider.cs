@@ -60,7 +60,7 @@ public sealed class HardwareInventoryProvider : IHardwareInventoryProvider
         return Task.FromResult(report);
     }
 
-    private static string ReadMany(string query, Func<ManagementObject, string?> selector, int maxItems = 8)
+    private static string ReadMany(string query, Func<ManagementObject, string?> selector, int maxItems = 8, string joiner = "; ")
     {
         try
         {
@@ -72,7 +72,7 @@ public sealed class HardwareInventoryProvider : IHardwareInventoryProvider
                 .Take(maxItems)
                 .ToList();
 
-            return items.Count == 0 ? "None" : string.Join("; ", items!);
+            return items.Count == 0 ? "None" : string.Join(joiner, items!);
         }
         catch
         {
@@ -80,6 +80,52 @@ public sealed class HardwareInventoryProvider : IHardwareInventoryProvider
         }
     }
 
+        private string ReadStorageDetails()
+    {
+        try
+        {
+            var results = new global::System.Collections.Generic.List<string>();
+            using var searcherPhysical = new ManagementObjectSearcher("Root\\Microsoft\\Windows\\Storage", "SELECT MediaType, HealthStatus, Size, FriendlyName FROM MSFT_PhysicalDisk");
+            var physicalDisks = searcherPhysical.Get().Cast<ManagementObject>().ToList();
+
+            if (physicalDisks.Count > 0)
+            {
+                foreach (var disk in physicalDisks)
+                {
+                    var name = disk["FriendlyName"]?.ToString() ?? "Unknown Disk";
+                    var mediaTypeVal = Convert.ToInt32(disk["MediaType"]);
+                    var mediaType = mediaTypeVal == 4 ? "SSD" : (mediaTypeVal == 3 ? "HDD" : "Unknown Type");
+                    
+                    var healthStatusVal = Convert.ToInt32(disk["HealthStatus"]);
+                    var health = healthStatusVal == 0 ? "Healthy" : (healthStatusVal == 1 ? "Warning" : "Unhealthy");
+                    
+                    var sizeGb = disk["Size"] is null ? "?" : $"{Math.Round(Convert.ToDouble(disk["Size"]) / 1024 / 1024 / 1024, 0)} GB";
+                    
+                    string wearInfo = "";
+                    try {
+                        var wear = disk["Wear"];
+                        if (wear != null && Convert.ToDouble(wear) > 0) 
+                            wearInfo = $", Health: {100 - Convert.ToDouble(wear)}%";
+                    } catch { }
+
+                    results.Add($"{name}\n   {mediaType} - {sizeGb} - Status: {health}{wearInfo}");
+                }
+                return string.Join("\n\n", results);
+            }
+        }
+        catch { }
+
+        // Fallback if MSFT_PhysicalDisk is unavailable (requires admin sometimes)
+        return ReadMany("SELECT Model,MediaType,Size,Status FROM Win32_DiskDrive", x =>
+        {
+            var model = x["Model"]?.ToString() ?? "Unknown";
+            var mediaType = x["MediaType"]?.ToString() ?? "Local Disk";
+            var status = x["Status"]?.ToString() ?? "OK";
+            var sizeGb = x["Size"] is null ? "?" : $"{Math.Round(Convert.ToDouble(x["Size"]) / 1024 / 1024 / 1024, 0)}GB";
+            if (mediaType.Contains("Fixed")) mediaType = "SSD/HDD";
+            return $"{model}\n   {mediaType} - {sizeGb} - Status: {status}";
+        }, 10, "\n\n");
+    }
     private static string? ReadSingle(string query, Func<ManagementObject, string?> selector)
     {
         try
@@ -108,3 +154,5 @@ public sealed class HardwareInventoryProvider : IHardwareInventoryProvider
         }
     }
 }
+
+

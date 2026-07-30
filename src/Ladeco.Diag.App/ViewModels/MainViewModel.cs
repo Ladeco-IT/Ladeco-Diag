@@ -1,4 +1,8 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.IO;
+using System.Net.Http;
+using System.Text.Json;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -12,12 +16,14 @@ using LiveChartsCore.SkiaSharpView;
 using LiveChartsCore.SkiaSharpView.Painting;
 using SkiaSharp;
 
+using System.Collections.ObjectModel;
 namespace Ladeco.Diag.App.ViewModels;
 
 public partial class MainViewModel : ObservableObject
 {
     private readonly IDiagnosticsOrchestrator _orchestrator;
     private readonly ISystemSnapshotProvider _snapshotProvider;
+    private readonly IHardwareInventoryProvider _hardwareInventoryProvider;
     private readonly IReportExporter _reportExporter;
     private readonly IThemeService _themeService;
     private readonly IConfirmationDialogService _confirmationDialog;
@@ -30,9 +36,50 @@ public partial class MainViewModel : ObservableObject
 
     private ScanReport? _latestReport;
 
+
+   [ObservableProperty] private ObservableCollection<string> startupServices = new();
+    
+    [RelayCommand]
+    private void LoadStartupServices()
+    {
+        try
+        {
+            StartupServices.Clear();
+            var services = System.ServiceProcess.ServiceController.GetServices().Where(s => s.StartType == System.ServiceProcess.ServiceStartMode.Automatic).Take(20);
+            foreach (var s in services)
+            {
+                StartupServices.Add($"{s.DisplayName} ({s.Status})");
+            }
+        }
+        catch { /* Must run as admin to see all, ignore errors for now */ }
+    }
+
+   [ObservableProperty] private ObservableCollection<string> runningProcesses = new();
+
+    private void UpdateProcesses()
+    {
+        try
+        {
+            var processes = System.Diagnostics.Process.GetProcesses()
+                .OrderByDescending(p => p.WorkingSet64)
+                .Take(15)
+                .Select(p => $"{p.ProcessName} ({Math.Round(p.WorkingSet64 / 1024.0 / 1024.0, 1)} MB)");
+            
+            App.Current.Dispatcher.Invoke(() =>
+            {
+                RunningProcesses.Clear();
+                foreach (var p in processes) RunningProcesses.Add(p);
+            });
+        }
+        catch { }
+    }
+
+    private System.Timers.Timer? _snapshotTimer;
+
     public MainViewModel(
         IDiagnosticsOrchestrator orchestrator,
         ISystemSnapshotProvider snapshotProvider,
+        IHardwareInventoryProvider hardwareInventoryProvider,
         IReportExporter reportExporter,
         IThemeService themeService,
         IConfirmationDialogService confirmationDialog,
@@ -45,6 +92,7 @@ public partial class MainViewModel : ObservableObject
     {
         _orchestrator = orchestrator;
         _snapshotProvider = snapshotProvider;
+        _hardwareInventoryProvider = hardwareInventoryProvider;
         _reportExporter = reportExporter;
         _themeService = themeService;
         _confirmationDialog = confirmationDialog;
@@ -77,11 +125,22 @@ public partial class MainViewModel : ObservableObject
         XAxes = [new Axis { Name = "Samples" }];
         YAxes = [new Axis { Name = "%", MinLimit = 0, MaxLimit = 100 }];
 
+        var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+        AppVersionString = version != null ? $"v{version.Major}.{version.Minor}.{version.Build}" : "Onbekend";
+
         IsBusy = true;
         _ = Task.Run(async () =>
         {
             await RefreshRuntimeSnapshotAsync();
             System.Windows.Application.Current.Dispatcher.Invoke(() => IsBusy = false);
+            
+            _snapshotTimer = new System.Timers.Timer(5000);
+            _snapshotTimer.Elapsed += async (s, e) => {
+                try {
+                    await RefreshRuntimeSnapshotAsync();
+                } catch { }
+            };
+            _snapshotTimer.Start();
         });
     }
 
@@ -111,6 +170,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string storageUsageDisplay = "-";
     [ObservableProperty] private string cpuTemperatureDisplay = "-";
     [ObservableProperty] private string internetStatus = "-";
+    [ObservableProperty] private string internetLatency = "-";
     [ObservableProperty] private string defenderStatus = "-";
     [ObservableProperty] private string bitLockerStatus = "-";
     [ObservableProperty] private string batteryStatus = "-";
@@ -120,15 +180,168 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string cpuName = "-";
     [ObservableProperty] private string gpuName = "-";
     [ObservableProperty] private string totalRam = "-";
+    [ObservableProperty] private string hardwareMotherboard = "-";
+    [ObservableProperty] private string hardwareBios = "-";
+    [ObservableProperty] private string hardwareStorage = "-";
+    [ObservableProperty] private string hardwareMonitors = "-";
+    [ObservableProperty] private string hardwareResolution = "-";
+    [ObservableProperty] private string hardwareNetworkAdapters = "-";
+    [ObservableProperty] private string hardwareBluetooth = "-";
+    [ObservableProperty] private string hardwareAudio = "-";
+    [ObservableProperty] private string hardwareUsb = "-";
+    [ObservableProperty] private string hardwarePrinters = "-";
+    [ObservableProperty] private string hardwareCameras = "-";
+    [ObservableProperty] private string hardwareMics = "-";
+    [ObservableProperty] private string hardwareSerials = "-";
     [ObservableProperty] private string recentScanSummary = string.Empty;
     [ObservableProperty] private string aiAssistantSummary = string.Empty;
     [ObservableProperty] private bool isBusy = false;
     [ObservableProperty] private bool isActionRunning = false;
+    [ObservableProperty] private bool isActionOverlayVisible = false;
     [ObservableProperty] private string lastPdfPath = string.Empty;
     [ObservableProperty] private bool canOpenPdf = false;
     [ObservableProperty] private string currentActionName = string.Empty;
+    [ObservableProperty] private string appVersionString = string.Empty;
     
+        [RelayCommand]
+    private async Task LoadHardwareAsync()
+    {
+        try
+        {
+            var hw = await _hardwareInventoryProvider.GetInventoryAsync();
+            HardwareMotherboard = hw.Motherboard;
+            HardwareBios = hw.BiosVersion;
+            HardwareStorage = hw.StorageDevices;
+            HardwareMonitors = hw.Monitors;
+            HardwareResolution = hw.Resolution;
+            HardwareNetworkAdapters = hw.NetworkAdapters;
+            HardwareBluetooth = hw.BluetoothAdapters;
+            HardwareAudio = hw.AudioDevices;
+            HardwareUsb = hw.UsbDevices;
+            HardwarePrinters = hw.Printers;
+            HardwareCameras = hw.CameraDevices;
+            HardwareMics = hw.Microphones;
+            HardwareSerials = hw.SerialNumbers;
+        }
+        catch { /* ignored */ }
+    }
+
     private CancellationTokenSource? _actionCts;
+
+    [RelayCommand]
+    private async Task AutoFixAsync(FindingItem item)
+    {
+        if (string.IsNullOrWhiteSpace(item.AutoFixCommand)) return;
+        await ExecuteRemediationAsync(item.AutoFixCommand, $"Wilt u het probleem '{item.Title}' automatisch oplossen?");
+    }
+
+    [RelayCommand]
+    private async Task AppUpdateAsync()
+    {
+        CurrentActionName = "Controleren op updates (GitHub)...";
+        IsActionRunning = true;
+        IsActionOverlayVisible = true;
+        ActionOutput = "Zoeken naar de nieuwste release op GitHub...";
+
+        try
+        {
+            using var client = new HttpClient();
+            // GitHub API required a User-Agent header
+            client.DefaultRequestHeaders.Add("User-Agent", "LadecoDiag-Updater");
+            
+            // NOTE: Using /releases instead of /releases/latest because the release is a "pre-release"
+            var response = await client.GetAsync("https://api.github.com/repos/Ladeco-IT/Ladeco-Diag/releases");
+            if (!response.IsSuccessStatusCode)
+            {
+                ActionOutput += $"\n\nKan geen updates vinden. (Status {response.StatusCode}) \nZorg dat de repository public is of dat het pad klopt.";
+                CurrentActionName = "Fout bij controleren.";
+                IsActionRunning = false;
+                return;
+            }
+
+            var json = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            if (root.GetArrayLength() == 0)
+            {
+                ActionOutput += $"\n\nGeen releases gevonden op GitHub.";
+                CurrentActionName = "Controle voltooid.";
+                IsActionRunning = false;
+                return;
+            }
+
+            var latestRelease = root[0]; // the newest release is traditionally first in the list
+            var latestTag = latestRelease.GetProperty("tag_name").GetString()?.Replace("v", "") ?? "0.0.0";
+            
+            // Extract the creation or published date of the latest release for comparison
+            DateTime onlineDate = DateTime.MinValue;
+            if (latestRelease.TryGetProperty("published_at", out var publishedAtElement))
+            {
+                DateTime.TryParse(publishedAtElement.GetString(), out onlineDate);
+            }
+            
+            ActionOutput += $"\nNieuwste versie online: {latestTag} ({onlineDate:dd/MM/yyyy HH:mm})\nHuidige versie: {AppVersionString.Replace("v", "")}";
+
+            // Check if online date is newer than local build date by scanning the local exe timestamp
+            var localExePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
+            var localCreateDate = File.GetCreationTime(localExePath);
+            
+            // If the online Github Release date is later than our local build timestamp (with a small 1 hour wiggle room for timezone differences)
+            if (onlineDate > localCreateDate.AddHours(1))
+            {
+                ActionOutput += "\n\nNieuwe update gevonden! Downloaden...";
+                
+                // Find installer asset
+                string? downloadUrl = null;
+                var assets = latestRelease.GetProperty("assets");
+                foreach (var asset in assets.EnumerateArray())
+                {
+                    var name = asset.GetProperty("name").GetString() ?? "";
+                    if (name.EndsWith(".exe") && name.Contains("Setup"))
+                    {
+                        downloadUrl = asset.GetProperty("browser_download_url").GetString();
+                        break;
+                    }
+                }
+
+                if (string.IsNullOrEmpty(downloadUrl))
+                {
+                    ActionOutput += "\nKan geen setup .exe vinden in deze release.";
+                    IsActionRunning = false;
+                    return;
+                }
+
+                var tempFile = Path.Combine(Path.GetTempPath(), "LadecoDiagUpdate.exe");
+                
+                var fileBytes = await client.GetByteArrayAsync(downloadUrl);
+                await File.WriteAllBytesAsync(tempFile, fileBytes);
+                
+                ActionOutput += "\nDownload voltooid! De installer wordt nu gestart. LadecoDiag wordt afgesloten.";
+                
+                // Start installer with Silent flag and wait for a second to close current process
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = tempFile,
+                    Arguments = "/SILENT",
+                    UseShellExecute = true
+                });
+                
+                System.Windows.Application.Current.Dispatcher.Invoke(() => System.Windows.Application.Current.Shutdown());
+                return;
+            }
+            else
+            {
+                ActionOutput += "\n\nU heeft al de nieuwste versie!";
+            }
+        }
+        catch (Exception ex)
+        {
+            ActionOutput += $"\n\nFout tijdens updaten: {ex.Message}";
+        }
+
+        CurrentActionName = "Controle voltooid.";
+        IsActionRunning = false;
+    }
 
     [RelayCommand]
     private async Task RunScanAsync()
@@ -286,6 +499,12 @@ public partial class MainViewModel : ObservableObject
     private Task RebootSystemAsync() => ExecuteRemediationAsync("RebootSystem", _localization["Action.Reboot"]);
 
     [RelayCommand]
+    private void CloseActionOverlay()
+    {
+        IsActionOverlayVisible = false;
+    }
+
+    [RelayCommand]
     private void CancelAction()
     {
         if (_actionCts != null && !_actionCts.IsCancellationRequested)
@@ -303,6 +522,7 @@ public partial class MainViewModel : ObservableObject
 
         CurrentActionName = $"Actie '{actionKey}' wordt uitgevoerd...";
         IsActionRunning = true;
+        IsActionOverlayVisible = true;
         ActionOutput = $"Laden van PowerShell/Command module voor {actionKey}...";
         
         _actionCts = new CancellationTokenSource();
@@ -310,18 +530,19 @@ public partial class MainViewModel : ObservableObject
         try
         {
             var (success, output) = await Task.Run(() => _remediationService.RunSafeActionAsync(actionKey, _actionCts.Token), _actionCts.Token);
-            ActionOutput = success ? $"{_localization["Action.Success"]}:\n{output}" : $"{_localization["Action.Failed"]}:\n{output}";
+            ActionOutput = success ? $"{_localization["Action.Success"]}:\n{output}\n\n[VOLTOOID]" : $"{_localization["Action.Failed"]}:\n{output}\n\n[VOLTOOID MET FOUTEN]";
         }
         catch (OperationCanceledException)
         {
-             ActionOutput = "Actie werd afgebroken door de gebruiker.";
+             ActionOutput = "Actie werd afgebroken door de gebruiker.\n\n[GEANNULEERD]";
         }
         catch (Exception ex)
         {
-             ActionOutput = $"Fout: {ex.Message}";
+             ActionOutput = $"Fout: {ex.Message}\n\n[FOUT]";
         }
         finally
         {
+             CurrentActionName = $"Actie '{actionKey}' is gestopt.";
              IsActionRunning = false;
              _actionCts.Dispose();
              _actionCts = null;
@@ -347,6 +568,7 @@ public partial class MainViewModel : ObservableObject
         StorageUsageDisplay = $"{snapshot.StorageUsagePercent:F1}%";
         CpuTemperatureDisplay = snapshot.CpuTemperatureCelsius.HasValue ? $"{snapshot.CpuTemperatureCelsius:F1} C" : "N/A";
         InternetStatus = snapshot.InternetAvailable ? "Online" : "Offline";
+        InternetLatency = snapshot.LatencyMs >= 0 ? $"{snapshot.LatencyMs} ms" : "N/A";
         DefenderStatus = snapshot.DefenderStatus;
         BitLockerStatus = snapshot.BitLockerStatus;
         BatteryStatus = snapshot.BatteryStatus;
@@ -360,6 +582,7 @@ public partial class MainViewModel : ObservableObject
         AppendSample(0, snapshot.CpuUsagePercent);
         AppendSample(1, snapshot.RamUsagePercent);
         AppendSample(2, snapshot.StorageUsagePercent);
+        UpdateProcesses();
     }
 
     private void AppendSample(int seriesIndex, double value)

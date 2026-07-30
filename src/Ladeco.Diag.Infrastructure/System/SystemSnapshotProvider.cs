@@ -61,7 +61,23 @@ public sealed class SystemSnapshotProvider : ISystemSnapshotProvider
             NetworkSpeed: ReadNetworkSpeed(),
             CpuName: cpuName,
             GpuName: gpuName,
-            TotalRam: totalRamStr);
+            TotalRam: totalRamStr,
+            LatencyMs: ReadLatency());
+    }
+
+    private static long ReadLatency()
+    {
+        try
+        {
+            using var pinger = new Ping();
+            var reply = pinger.Send("8.8.8.8", 1500);
+            if (reply.Status == IPStatus.Success)
+            {
+                return reply.RoundtripTime;
+            }
+        }
+        catch { }
+        return -1;
     }
 
     private static IEnumerable<string> ReadHardwareInfo(string wmiClass, string property)
@@ -84,18 +100,48 @@ public sealed class SystemSnapshotProvider : ISystemSnapshotProvider
     {
         try
         {
-            using var searcher = new ManagementObjectSearcher("root\\WMI", "SELECT Ndis80211ReceivedSignalStrength FROM MSNdis_80211_ReceivedSignalStrength");
-            var item = searcher.Get().Cast<ManagementObject>().FirstOrDefault();
-            if (item != null)
+            var isWifi = NetworkInterface.GetAllNetworkInterfaces()
+                .Any(x => x.OperationalStatus == OperationalStatus.Up && x.NetworkInterfaceType == NetworkInterfaceType.Wireless80211);
+                
+            if (!isWifi)
             {
-                var signal = Convert.ToInt32(item["Ndis80211ReceivedSignalStrength"]);
-                var quality = signal > -50 ? "Uitstekend" : signal > -70 ? "Goed" : signal > -80 ? "Matig" : "Zwak";
-                return ("WiFi (Draadloos)", $"{signal} dBm ({quality})");
+                return ("Ethernet (Bekabeld)", "N/A");
+            }
+            
+            var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = "netsh",
+                    Arguments = "wlan show interfaces",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    CreateNoWindow = true
+                }
+            };
+            process.Start();
+            var output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit();
+
+            var lines = output.Split('\n');
+            var signalLine = lines.FirstOrDefault(l => l.Contains("Signal") || l.Contains("Signaal"));
+            if (signalLine != null)
+            {
+                var parts = signalLine.Split(':');
+                if (parts.Length > 1)
+                {
+                    var signalStr = parts[1].Trim().Replace("%", "");
+                    if (int.TryParse(signalStr, out int signalPercent))
+                    {
+                        var quality = signalPercent > 80 ? "Uitstekend" : signalPercent > 60 ? "Goed" : signalPercent > 40 ? "Matig" : "Zwak";
+                        return ("WiFi (Draadloos)", $"{signalPercent}% ({quality})");
+                    }
+                }
             }
         }
         catch
         {
-            // Ignored, likely not on WiFi
+            // Ignored, fallback below
         }
 
         return ("Ethernet (Bekabeld)", "N/A");

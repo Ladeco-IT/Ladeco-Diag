@@ -9,6 +9,7 @@
         xmlns:ui="http://schemas.modernwpf.com/2019"
         ui:WindowHelper.UseModernWindowStyle="True"
         mc:Ignorable="d"
+        Icon="pack://application:,,,/Resources/Images/Logo.png"
         Title="Ladeco IT Diagnostic Tool"
         Height="860"
         Width="1440"
@@ -31,9 +32,12 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <StackPanel>
-                    <TextBlock Text="Ladeco IT Diagnostic Tool" FontSize="28" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
-                    <TextBlock Text="{Binding StatusText}" Margin="0,4,0,0" FontSize="14" Foreground="{DynamicResource TextSecondaryBrush}" />
+                <StackPanel Orientation="Horizontal">
+                    <Image Source="pack://application:,,,/Resources/Images/Logo.png" Width="32" Height="32" Margin="0,0,12,0" VerticalAlignment="Center" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Ladeco IT Diagnostic Tool" FontSize="28" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                        <TextBlock Text="{Binding StatusText}" Margin="0,4,0,0" FontSize="14" Foreground="{DynamicResource TextSecondaryBrush}" />
+                    </StackPanel>
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
@@ -124,6 +128,13 @@
                                     <DataGridTextColumn Header="Prioriteit" Binding="{Binding Priority}" Width="90" />
                                     <DataGridTextColumn Header="Oorzaak" Binding="{Binding Cause}" Width="2*" />
                                     <DataGridTextColumn Header="Oplossing" Binding="{Binding Resolution}" Width="2*" />
+                                    <DataGridTemplateColumn Header="Actie" Width="100">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Button Content="Fix" Command="{Binding DataContext.AutoFixCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}" Visibility="{Binding AutoFixAvailable, Converter={StaticResource BooleanToVisibilityConverter}}" Background="{StaticResource AccentBrush}" Foreground="White" BorderThickness="0" Padding="8,4" />
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
                                 </DataGrid.Columns>
                             </DataGrid>
                         </Grid>
@@ -151,7 +162,12 @@
                             </Grid.RowDefinitions>
 
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Internet Status:" Margin="0,0,0,10" Foreground="{DynamicResource TextSecondaryBrush}" />
-                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding InternetStatus}" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" />
+                            <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
+                                <TextBlock Text="{Binding InternetStatus}" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                <TextBlock Text=" (" Foreground="{DynamicResource TextSecondaryBrush}" Margin="5,0,0,0" />
+                                <TextBlock Text="{Binding InternetLatency}" Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <TextBlock Text=")" Foreground="{DynamicResource TextSecondaryBrush}" />
+                            </StackPanel>
 
                             <TextBlock Grid.Row="1" Grid.Column="0" Text="Type netwerk:" Margin="0,0,0,10" Foreground="{DynamicResource TextSecondaryBrush}" />
                             <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding NetworkType}" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" />
@@ -168,6 +184,168 @@
                             <TextBlock Grid.Row="5" Grid.Column="0" Text="Publiek IPv4:" Margin="0,0,0,10" Foreground="{DynamicResource TextSecondaryBrush}" />
                             <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding PublicIpAddress}" FontWeight="Medium" Foreground="{DynamicResource TextPrimaryBrush}" />
                         </Grid>
+                    </StackPanel>
+                </Border>
+            </TabItem>
+                        <TabItem Header="Computer" FontSize="16">
+                <!-- Data triggers/behaviors to auto-load hardware info aren't available out of the box in basic WPF without interaction/Blend, 
+                     so we will attach it through a Load button for now or run it on startup in App.xaml.cs -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="0,0,10,0">
+                        
+                        <Button Command="{Binding LoadHardwareCommand}" Content="Hardware informatie (opnieuw) laden" Padding="12,8" Margin="0,0,0,16" HorizontalAlignment="Left" Style="{DynamicResource PrimaryButtonStyle}" />
+
+                        <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="16" Padding="16" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="Systeem &amp; Processor" FontWeight="SemiBold" FontSize="16" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="150" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Text="Moederbord:" Foreground="{DynamicResource TextSecondaryBrush}" Grid.Row="0" Grid.Column="0" Margin="0,4"/>
+                                    <TextBlock Text="{Binding HardwareMotherboard}" Foreground="{DynamicResource TextPrimaryBrush}" Grid.Row="0" Grid.Column="1" Margin="0,4" TextWrapping="Wrap"/>
+                                    
+                                    <TextBlock Text="BIOS:" Foreground="{DynamicResource TextSecondaryBrush}" Grid.Row="1" Grid.Column="0" Margin="0,4"/>
+                                    <TextBlock Text="{Binding HardwareBios}" Foreground="{DynamicResource TextPrimaryBrush}" Grid.Row="1" Grid.Column="1" Margin="0,4" TextWrapping="Wrap"/>
+
+                                    <TextBlock Text="Processor (CPU):" Foreground="{DynamicResource TextSecondaryBrush}" Grid.Row="2" Grid.Column="0" Margin="0,4"/>
+                                    <TextBlock Text="{Binding CpuName}" Foreground="{DynamicResource TextPrimaryBrush}" Grid.Row="2" Grid.Column="1" Margin="0,4" TextWrapping="Wrap"/>
+
+                                    <TextBlock Text="Werkgeheugen:" Foreground="{DynamicResource TextSecondaryBrush}" Grid.Row="3" Grid.Column="0" Margin="0,4"/>
+                                    <TextBlock Text="{Binding TotalRam}" Foreground="{DynamicResource TextPrimaryBrush}" Grid.Row="3" Grid.Column="1" Margin="0,4" TextWrapping="Wrap"/>
+                                    
+                                    <TextBlock Text="Grafische Kaart:" Foreground="{DynamicResource TextSecondaryBrush}" Grid.Row="4" Grid.Column="0" Margin="0,4"/>
+                                    <TextBlock Text="{Binding GpuName}" Foreground="{DynamicResource TextPrimaryBrush}" Grid.Row="4" Grid.Column="1" Margin="0,4" TextWrapping="Wrap"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="16" Padding="16" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="Opslag &amp; Connectiviteit" FontWeight="SemiBold" FontSize="16" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="150" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Text="Opslagapparaten:" Foreground="{DynamicResource TextSecondaryBrush}" Grid.Row="0" Grid.Column="0" Margin="0,4"/>
+                                    <TextBlock Text="{Binding HardwareStorage}" Foreground="{DynamicResource TextPrimaryBrush}" Grid.Row="0" Grid.Column="1" Margin="0,4" TextWrapping="Wrap" LineHeight="20" FontWeight="Medium"/>
+                                    
+                                    <TextBlock Text="Netwerkadapters:" Foreground="{DynamicResource TextSecondaryBrush}" Grid.Row="1" Grid.Column="0" Margin="0,4"/>
+                                    <TextBlock Text="{Binding HardwareNetworkAdapters}" Foreground="{DynamicResource TextPrimaryBrush}" Grid.Row="1" Grid.Column="1" Margin="0,4" TextWrapping="Wrap"/>
+                                    
+                                    <TextBlock Text="Bluetooth:" Foreground="{DynamicResource TextSecondaryBrush}" Grid.Row="2" Grid.Column="0" Margin="0,4"/>
+                                    <TextBlock Text="{Binding HardwareBluetooth}" Foreground="{DynamicResource TextPrimaryBrush}" Grid.Row="2" Grid.Column="1" Margin="0,4" TextWrapping="Wrap"/>
+
+                                    <TextBlock Text="USB Apparaten:" Foreground="{DynamicResource TextSecondaryBrush}" Grid.Row="3" Grid.Column="0" Margin="0,4"/>
+                                    <TextBlock Text="{Binding HardwareUsb}" Foreground="{DynamicResource TextPrimaryBrush}" Grid.Row="3" Grid.Column="1" Margin="0,4" TextWrapping="Wrap"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="16" Padding="16" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="Multimedia &amp; Randapparatuur" FontWeight="SemiBold" FontSize="16" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="150" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Text="Audio:" Foreground="{DynamicResource TextSecondaryBrush}" Grid.Row="0" Grid.Column="0" Margin="0,4"/>
+                                    <TextBlock Text="{Binding HardwareAudio}" Foreground="{DynamicResource TextPrimaryBrush}" Grid.Row="0" Grid.Column="1" Margin="0,4" TextWrapping="Wrap"/>
+
+                                    <TextBlock Text="Monitoren:" Foreground="{DynamicResource TextSecondaryBrush}" Grid.Row="1" Grid.Column="0" Margin="0,4"/>
+                                    <TextBlock Text="{Binding HardwareMonitors}" Foreground="{DynamicResource TextPrimaryBrush}" Grid.Row="1" Grid.Column="1" Margin="0,4" TextWrapping="Wrap"/>
+
+                                    <TextBlock Text="Resolutie:" Foreground="{DynamicResource TextSecondaryBrush}" Grid.Row="2" Grid.Column="0" Margin="0,4"/>
+                                    <TextBlock Text="{Binding HardwareResolution}" Foreground="{DynamicResource TextPrimaryBrush}" Grid.Row="2" Grid.Column="1" Margin="0,4" TextWrapping="Wrap"/>
+
+                                    <TextBlock Text="Printers:" Foreground="{DynamicResource TextSecondaryBrush}" Grid.Row="3" Grid.Column="0" Margin="0,4"/>
+                                    <TextBlock Text="{Binding HardwarePrinters}" Foreground="{DynamicResource TextPrimaryBrush}" Grid.Row="3" Grid.Column="1" Margin="0,4" TextWrapping="Wrap"/>
+                                    
+                                    <TextBlock Text="Serienummers:" Foreground="{DynamicResource TextSecondaryBrush}" Grid.Row="4" Grid.Column="0" Margin="0,4"/>
+                                    <TextBlock Text="{Binding HardwareSerials}" Foreground="{DynamicResource TextPrimaryBrush}" Grid.Row="4" Grid.Column="1" Margin="0,4" TextWrapping="Wrap"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+                        <TabItem Header="Achtergrond" FontSize="16">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="0,0,10,0">
+                        <Grid Margin="0,0,0,12">
+                             <Grid.ColumnDefinitions>
+                                 <ColumnDefinition Width="*" />
+                                 <ColumnDefinition Width="*" />
+                             </Grid.ColumnDefinitions>
+                             
+                             <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                                <TextBlock Text="Top Processen (RAMgebruik)" FontWeight="SemiBold" FontSize="16" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,12"/>
+                                <ItemsControl ItemsSource="{Binding RunningProcesses}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                             </StackPanel>
+
+                             <StackPanel Grid.Column="1" Margin="6,0,0,0">
+                                <TextBlock Text="Automatische Services" FontWeight="SemiBold" FontSize="16" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,6"/>
+                                <Button Command="{Binding LoadStartupServicesCommand}" Content="Vernieuw" Margin="0,0,0,6" HorizontalAlignment="Left" Style="{DynamicResource PrimaryButtonStyle}" />
+                                <ItemsControl ItemsSource="{Binding StartupServices}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                             </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="Instellingen" FontSize="16">
+                <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="16" Padding="16">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                            <TextBlock Text="Applicatie Instellingen en Updates" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                            <TextBlock Text="{Binding AppVersionString, StringFormat=' ({0})'}" FontSize="14" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Bottom" Margin="5,0,0,2"/>
+                        </StackPanel>
+                        
+                        <Button Content="Controleer op updates" Command="{Binding AppUpdateCommand}" Margin="0,0,0,10" Padding="14,8" Background="{StaticResource AccentBrush}" Foreground="White" BorderThickness="0" />
+                        
+                        <!-- Extra Settings would go here -->
+                        <TextBlock Text="Thema Instellingen:" Margin="0,10,0,5" Foreground="{DynamicResource TextSecondaryBrush}" />
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="Light Mode" Command="{Binding LightThemeCommand}" Margin="0,0,8,0" />
+                            <Button Content="Dark Mode" Command="{Binding DarkThemeCommand}" />
+                        </StackPanel>
                     </StackPanel>
                 </Border>
             </TabItem>
@@ -206,7 +384,7 @@
         </Border>
 
         <!-- Progress/Terminal Popup Overlay -->
-        <Border Grid.RowSpan="3" Background="#AA000000" Visibility="{Binding IsActionRunning, Converter={StaticResource BooleanToVisibilityConverter}}">
+        <Border Grid.RowSpan="3" Background="#AA000000" Visibility="{Binding IsActionOverlayVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
             <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="16" Padding="20" HorizontalAlignment="Center" VerticalAlignment="Center" Width="800" MaxHeight="600">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -216,7 +394,7 @@
                     </Grid.RowDefinitions>
                     
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                        <ProgressBar IsIndeterminate="True" Width="24" Height="24" Margin="0,0,10,0" />
+                        <ProgressBar IsIndeterminate="{Binding IsActionRunning}" Visibility="{Binding IsActionRunning, Converter={StaticResource BooleanToVisibilityConverter}}" Width="24" Height="24" Margin="0,0,10,0" />
                         <TextBlock Text="{Binding CurrentActionName}" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                     </StackPanel>
                     
@@ -226,9 +404,13 @@
                         </ScrollViewer>
                     </Border>
                     
-                    <Button Grid.Row="2" Content="Stop Actie" Command="{Binding CancelActionCommand}" Margin="0,16,0,0" Padding="16,8" HorizontalAlignment="Right" Foreground="White" Background="{DynamicResource SystemControlErrorTextForegroundBrush}" BorderThickness="0" />
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+                        <Button Content="Sluiten" Command="{Binding CloseActionOverlayCommand}" Visibility="{Binding IsActionRunning, Converter={StaticResource InverseBooleanConverter}}" Margin="0,0,8,0" Padding="16,8" Foreground="White" Background="{StaticResource AccentBrush}" BorderThickness="0" />
+                        <Button Content="Stop Actie" Command="{Binding CancelActionCommand}" Visibility="{Binding IsActionRunning, Converter={StaticResource BooleanToVisibilityConverter}}" Padding="16,8" Foreground="White" Background="{DynamicResource SystemControlErrorTextForegroundBrush}" BorderThickness="0" />
+                    </StackPanel>
                 </Grid>
             </Border>
         </Border>
     </Grid>
 </Window>
+

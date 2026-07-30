@@ -1,11 +1,17 @@
 param(
     [string]$Configuration = "Release",
     [string]$Runtime = "win-x64",
-    [string]$Version = "1.0.0",
+    [string]$Version = "",
     [switch]$SelfContained = $true
 )
 
 $ErrorActionPreference = "Stop"
+
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    # Generate version based on date: 1.0.YY.MMDD
+    $now = Get-Date
+    $Version = "1.0.$($now.ToString('yy')).$($now.ToString('MMdd'))"
+}
 
 function Get-IsccPath {
     if ($env:ISCC_PATH -and (Test-Path $env:ISCC_PATH)) {

@@ -30,6 +30,49 @@ public sealed class RemediationService : IRemediationService
 
     public async Task<(bool Success, string Output)> RunSafeActionAsync(string actionKey, CancellationToken cancellationToken = default)
     {
+        if (actionKey.Equals("RunSpeedtest", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                var timerDL = Stopwatch.StartNew();
+                var reqDL = System.Net.WebRequest.Create("http://speedtest.tele2.net/100MB.zip");
+                reqDL.Timeout = 10000;
+                using var respDL = await reqDL.GetResponseAsync();
+                using var streamDL = respDL.GetResponseStream();
+                var buffer = new byte[81920];
+                long totalBytesDL = 0;
+                while (timerDL.Elapsed.TotalSeconds < 8)
+                {
+                    int read = await streamDL.ReadAsync(buffer, 0, buffer.Length, cancellationToken);
+                    if (read == 0) break;
+                    totalBytesDL += read;
+                }
+                timerDL.Stop();
+                double dlMbps = (totalBytesDL * 8.0 / 1000000.0) / timerDL.Elapsed.TotalSeconds;
+
+                // Upload Test
+                var timerUL = Stopwatch.StartNew();
+                var reqUL = System.Net.WebRequest.Create("http://speedtest.tele2.net/upload.php");
+                reqUL.Method = "POST";
+                reqUL.Timeout = 10000;
+                var dataUL = new byte[2 * 1024 * 1024];
+                reqUL.ContentLength = dataUL.Length;
+                using (var streamUL = reqUL.GetRequestStream())
+                {
+                    await streamUL.WriteAsync(dataUL, 0, dataUL.Length, cancellationToken);
+                }
+                using var respUL = await reqUL.GetResponseAsync();
+                timerUL.Stop();
+                double ulMbps = (dataUL.Length * 8.0 / 1000000.0) / timerUL.Elapsed.TotalSeconds;
+
+                return (true, $"Download: {dlMbps:N2} Mbps | Upload: {ulMbps:N2} Mbps");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Speedtest mislukt: {ex.Message}");
+            }
+        }
+
         if (!Commands.TryGetValue(actionKey, out var command))
         {
             return (false, "Onbekende actie.");
@@ -69,3 +112,5 @@ public sealed class RemediationService : IRemediationService
         }
     }
 }
+
+

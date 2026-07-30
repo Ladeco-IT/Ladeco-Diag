@@ -24,5 +24,6 @@ public sealed record RuntimeSnapshot(
     string NetworkSpeed,
     string CpuName,
     string GpuName,
-    string TotalRam
+    string TotalRam,
+    long LatencyMs
 );
