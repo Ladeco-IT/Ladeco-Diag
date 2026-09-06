@@ -70,6 +70,7 @@ public partial class App : Microsoft.UI.Xaml.Application
                 services.AddSingleton<ILocalizationService>(InMemoryLocalizationService.DutchDefaults());
                 services.AddSingleton<IThemeService, ThemeService>();
                 services.AddSingleton<IConfirmationDialogService, ConfirmationDialogService>();
+                services.AddSingleton<ILocalUserAccountService, LocalUserAccountService>();
                 services.AddSingleton<IRemediationService, RemediationService>();
                 services.AddSingleton<IFindingExplanationService, FindingExplanationService>();
                 services.AddSingleton<IReportExporter, ReportExporter>();

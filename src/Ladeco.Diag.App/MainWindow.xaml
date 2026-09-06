@@ -27,6 +27,7 @@
                 <Button Content="{Binding RunScanLabel}" Command="{Binding RunScanCommand}" />
                 <Button Content="{Binding GeneratePdfLabel}" Command="{Binding GeneratePdfCommand}" />
                 <Button Content="PDF openen" Command="{Binding OpenPdfCommand}" />
+                <Button Content="{Binding CreateAdministratorLabel}" Click="CreateAdministratorButton_Click" />
                 <Button Content="Actie openen" Command="{Binding OpenActionOverlayCommand}" />
                 <Button Content="Licht" Command="{Binding LightThemeCommand}" />
                 <Button Content="Donker" Command="{Binding DarkThemeCommand}" />
@@ -122,42 +123,44 @@
                 </ScrollViewer>
             </TabViewItem>
             <TabViewItem Header="Achtergrond" IsClosable="False">
-                <Grid Padding="0,16" ColumnSpacing="24">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Spacing="8">
-                        <TextBlock Text="Zwaarste processen" Style="{StaticResource SubtitleTextBlockStyle}" />
-                        <ListView ItemsSource="{Binding RunningProcesses}" SelectionMode="None">
-                            <ListView.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid Padding="6" ColumnSpacing="8">
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                        <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
-                                        <TextBlock Grid.Column="1" Text="{Binding MemoryUsage}" VerticalAlignment="Center" />
-                                        <Button Grid.Column="2" Content="Stop" Command="{Binding StopCommand}" CommandParameter="{Binding}" />
-                                    </Grid>
-                                </DataTemplate>
-                            </ListView.ItemTemplate>
-                        </ListView>
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" Spacing="8">
-                        <TextBlock Text="Opstartprogramma's" Style="{StaticResource SubtitleTextBlockStyle}" />
-                        <ListView ItemsSource="{Binding StartupApplications}" SelectionMode="None">
-                            <ListView.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid Padding="6" ColumnSpacing="8">
-                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                        <StackPanel><TextBlock Text="{Binding Name}" /><TextBlock Text="{Binding Command}" TextTrimming="CharacterEllipsis" Opacity="0.7" /></StackPanel>
-                                        <TextBlock Grid.Column="1" Text="{Binding IsEnabled}" VerticalAlignment="Center" />
-                                        <Button Grid.Column="2" Content="Wijzigen" Command="{Binding ToggleCommand}" CommandParameter="{Binding}" />
-                                    </Grid>
-                                </DataTemplate>
-                            </ListView.ItemTemplate>
-                        </ListView>
-                    </StackPanel>
-                </Grid>
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <Grid Padding="0,16" ColumnSpacing="24">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Zwaarste processen" Style="{StaticResource SubtitleTextBlockStyle}" />
+                            <ListView ItemsSource="{Binding RunningProcesses}" SelectionMode="None">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Padding="6" ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1" Text="{Binding MemoryUsage}" VerticalAlignment="Center" />
+                                            <Button Grid.Column="2" Content="Stop" Command="{Binding StopCommand}" CommandParameter="{Binding}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="8">
+                            <TextBlock Text="Opstartprogramma's" Style="{StaticResource SubtitleTextBlockStyle}" />
+                            <ListView ItemsSource="{Binding StartupApplications}" SelectionMode="None">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Padding="6" ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                            <StackPanel><TextBlock Text="{Binding Name}" /><TextBlock Text="{Binding SourceDescription}" Opacity="0.7" /><TextBlock Text="{Binding Command}" TextTrimming="CharacterEllipsis" Opacity="0.7" /></StackPanel>
+                                            <TextBlock Grid.Column="1" Text="{Binding IsEnabled}" VerticalAlignment="Center" />
+                                            <Button Grid.Column="2" Content="Wijzigen" Command="{Binding ToggleCommand}" CommandParameter="{Binding}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </StackPanel>
+                    </Grid>
+                </ScrollViewer>
             </TabViewItem>
             <TabViewItem Header="Herstel" IsClosable="False">
                 <ScrollViewer>
@@ -170,6 +173,7 @@
                                 <Button Content="DNS resetten" Command="{Binding DnsResetCommand}" />
                                 <Button Content="Winsock resetten" Command="{Binding WinsockCommand}" />
                                 <Button Content="Netwerk resetten" Command="{Binding NetworkResetCommand}" />
+                                <Button Content="Werk- of schoolverbinding" Command="{Binding OpenWorkOrSchoolSettingsCommand}" />
                                 <Button Content="Internetsnelheid testen" Command="{Binding RunSpeedtestCommand}" />
                             </StackPanel>
                         </StackPanel>

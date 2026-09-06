@@ -30,6 +30,7 @@ public sealed class RemediationService : IRemediationService
         ["RunGpuStressTest"] = "winsat dwmformal",
         ["RunMemoryTest"] = "winsat mem",
         ["RunDiskReadTest"] = "winsat disk -drive C -seq -read -count 3",
+        ["OpenWorkOrSchoolSettings"] = "start \"\" ms-settings:workplace",
         ["ClearEventLogs"] = "powershell -NoProfile -Command \"Get-EventLog -LogName * | ForEach { Clear-EventLog $_.Log }\"",
         ["RebootSystem"] = "shutdown /r /t 15 /c \"Ladeco IT Diagnostic reboot\""
     };

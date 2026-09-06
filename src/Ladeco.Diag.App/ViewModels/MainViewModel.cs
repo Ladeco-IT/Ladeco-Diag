@@ -112,6 +112,7 @@ public partial class MainViewModel : ObservableObject
 
         RunScanLabel = _localization["Dashboard.RunScan"];
         GeneratePdfLabel = _localization["Dashboard.GenerateReport"];
+        CreateAdministratorLabel = _localization["Account.CreateButton"];
         StatusText = _localization["Dashboard.Status.Ready"];
         RecentScanSummary = _localization["History.None"];
         AiAssistantSummary = _localization["AI.NoScan"];
@@ -167,6 +168,7 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty] private string runScanLabel = string.Empty;
     [ObservableProperty] private string generatePdfLabel = string.Empty;
+    [ObservableProperty] private string createAdministratorLabel = string.Empty;
     [ObservableProperty] private string statusText = string.Empty;
     [ObservableProperty] private string actionOutput = string.Empty;
 
@@ -299,22 +301,9 @@ public partial class MainViewModel : ObservableObject
             return;
         }
 
-        const string runKeyPath = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
-        const string disabledKeyPath = "Software\\Ladeco\\Diag\\DisabledStartupApps";
         try
         {
-            using var runKey = Registry.CurrentUser.CreateSubKey(runKeyPath, writable: true);
-            using var disabledKey = Registry.CurrentUser.CreateSubKey(disabledKeyPath, writable: true);
-            if (item.IsEnabled)
-            {
-                disabledKey.SetValue(item.Name, item.Command);
-                runKey.DeleteValue(item.Name, throwOnMissingValue: false);
-            }
-            else
-            {
-                runKey.SetValue(item.Name, item.Command);
-                disabledKey.DeleteValue(item.Name, throwOnMissingValue: false);
-            }
+            ToggleStartupApplication(item);
 
             LoadStartupApplications();
             ActionOutput = $"Opstartprogramma '{item.Name}' is {(item.IsEnabled ? "uitgeschakeld" : "ingeschakeld")}.";
@@ -327,22 +316,36 @@ public partial class MainViewModel : ObservableObject
 
     private void LoadStartupApplications()
     {
+        StartupApplications.Clear();
+        LoadRegistryStartupApplications(Registry.CurrentUser, RegistryView.Default, StartupSource.CurrentUserRegistry, "Huidige gebruiker");
+        LoadRegistryStartupApplications(Registry.LocalMachine, RegistryView.Registry64, StartupSource.LocalMachineRegistry64, "Alle gebruikers (64-bit)");
+        if (Environment.Is64BitOperatingSystem)
+        {
+            LoadRegistryStartupApplications(Registry.LocalMachine, RegistryView.Registry32, StartupSource.LocalMachineRegistry32, "Alle gebruikers (32-bit)");
+        }
+
+        LoadStartupFolder(Environment.GetFolderPath(Environment.SpecialFolder.Startup), StartupSource.UserStartupFolder, "Opstartmap huidige gebruiker");
+        LoadStartupFolder(Environment.GetFolderPath(Environment.SpecialFolder.CommonStartup), StartupSource.CommonStartupFolder, "Opstartmap alle gebruikers");
+    }
+
+    private void LoadRegistryStartupApplications(RegistryKey hive, RegistryView view, StartupSource source, string description)
+    {
         const string runKeyPath = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
         const string disabledKeyPath = "Software\\Ladeco\\Diag\\DisabledStartupApps";
-        StartupApplications.Clear();
         try
         {
-            using var runKey = Registry.CurrentUser.OpenSubKey(runKeyPath);
-            using var disabledKey = Registry.CurrentUser.OpenSubKey(disabledKeyPath);
-            AddStartupApplications(runKey, true);
-            AddStartupApplications(disabledKey, false);
+            using var baseKey = RegistryKey.OpenBaseKey(hive.Name == Registry.CurrentUser.Name ? RegistryHive.CurrentUser : RegistryHive.LocalMachine, view);
+            using var runKey = baseKey.OpenSubKey(runKeyPath);
+            using var disabledKey = baseKey.OpenSubKey(disabledKeyPath);
+            AddRegistryStartupApplications(runKey, true, source, description);
+            AddRegistryStartupApplications(disabledKey, false, source, description);
         }
         catch
         {
         }
     }
 
-    private void AddStartupApplications(RegistryKey? key, bool isEnabled)
+    private void AddRegistryStartupApplications(RegistryKey? key, bool isEnabled, StartupSource source, string description)
     {
         if (key is null)
         {
@@ -353,8 +356,67 @@ public partial class MainViewModel : ObservableObject
         {
             if (key.GetValue(name) is string command)
             {
-                StartupApplications.Add(new StartupApplicationItem(name, command, isEnabled, ToggleStartupApplicationCommand));
+                StartupApplications.Add(new StartupApplicationItem(name, command, isEnabled, ToggleStartupApplicationCommand, source, description));
             }
+        }
+    }
+
+    private void LoadStartupFolder(string folderPath, StartupSource source, string description)
+    {
+        try
+        {
+            if (!Directory.Exists(folderPath))
+            {
+                return;
+            }
+
+            foreach (var path in Directory.EnumerateFiles(folderPath, "*.lnk*"))
+            {
+                var isEnabled = !path.EndsWith(".disabled", StringComparison.OrdinalIgnoreCase);
+                StartupApplications.Add(new StartupApplicationItem(
+                    Path.GetFileNameWithoutExtension(isEnabled ? path : Path.GetFileNameWithoutExtension(path)),
+                    path,
+                    isEnabled,
+                    ToggleStartupApplicationCommand,
+                    source,
+                    description));
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private static void ToggleStartupApplication(StartupApplicationItem item)
+    {
+        if (item.Source is StartupSource.UserStartupFolder or StartupSource.CommonStartupFolder)
+        {
+            var targetPath = item.IsEnabled ? item.Command + ".disabled" : item.Command[..^".disabled".Length];
+            File.Move(item.Command, targetPath, overwrite: true);
+            return;
+        }
+
+        const string runKeyPath = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+        const string disabledKeyPath = "Software\\Ladeco\\Diag\\DisabledStartupApps";
+        var hive = item.Source == StartupSource.CurrentUserRegistry ? RegistryHive.CurrentUser : RegistryHive.LocalMachine;
+        var view = item.Source switch
+        {
+            StartupSource.CurrentUserRegistry => RegistryView.Default,
+            StartupSource.LocalMachineRegistry32 => RegistryView.Registry32,
+            _ => RegistryView.Registry64
+        };
+        using var baseKey = RegistryKey.OpenBaseKey(hive, view);
+        using var runKey = baseKey.CreateSubKey(runKeyPath, writable: true);
+        using var disabledKey = baseKey.CreateSubKey(disabledKeyPath, writable: true);
+        if (item.IsEnabled)
+        {
+            disabledKey.SetValue(item.Name, item.Command);
+            runKey.DeleteValue(item.Name, throwOnMissingValue: false);
+        }
+        else
+        {
+            runKey.SetValue(item.Name, item.Command);
+            disabledKey.DeleteValue(item.Name, throwOnMissingValue: false);
         }
     }
 
@@ -629,6 +691,9 @@ public partial class MainViewModel : ObservableObject
 
     [RelayCommand]
     private Task RunDiskReadTestAsync() => ExecuteRemediationAsync("RunDiskReadTest", _localization["Action.DiskReadTest"]);
+
+    [RelayCommand]
+    private Task OpenWorkOrSchoolSettingsAsync() => ExecuteRemediationAsync("OpenWorkOrSchoolSettings", _localization["Action.WorkOrSchoolSettings"]);
 
     [RelayCommand]
     private Task RebootSystemAsync() => ExecuteRemediationAsync("RebootSystem", _localization["Action.Reboot"]);
