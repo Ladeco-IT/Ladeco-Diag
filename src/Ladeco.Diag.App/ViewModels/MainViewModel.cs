@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Text.Json;
-using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Ladeco.Diag.App.Models;
@@ -11,12 +10,7 @@ using Ladeco.Diag.App.Services;
 using Ladeco.Diag.Application.Abstractions;
 using Ladeco.Diag.Domain.Diagnostics;
 using Ladeco.Diag.Reporting.Abstractions;
-using LiveChartsCore;
-using LiveChartsCore.SkiaSharpView;
-using LiveChartsCore.SkiaSharpView.Painting;
-using SkiaSharp;
-
-using System.Collections.ObjectModel;
+using Microsoft.UI.Dispatching;
 namespace Ladeco.Diag.App.ViewModels;
 
 public partial class MainViewModel : ObservableObject
@@ -33,8 +27,10 @@ public partial class MainViewModel : ObservableObject
     private readonly IFindingExplanationService _findingExplanationService;
     private readonly StorageOptions _storageOptions;
     private readonly AppOptions _appOptions;
+    private readonly DispatcherQueue _dispatcherQueue;
 
     private ScanReport? _latestReport;
+    private bool _monitoringStarted;
 
 
    [ObservableProperty] private ObservableCollection<string> startupServices = new();
@@ -65,11 +61,8 @@ public partial class MainViewModel : ObservableObject
                 .Take(15)
                 .Select(p => $"{p.ProcessName} ({Math.Round(p.WorkingSet64 / 1024.0 / 1024.0, 1)} MB)");
             
-            App.Current.Dispatcher.Invoke(() =>
-            {
-                RunningProcesses.Clear();
-                foreach (var p in processes) RunningProcesses.Add(p);
-            });
+            RunningProcesses.Clear();
+            foreach (var p in processes) RunningProcesses.Add(p);
         }
         catch { }
     }
@@ -102,6 +95,7 @@ public partial class MainViewModel : ObservableObject
         _findingExplanationService = findingExplanationService;
         _storageOptions = storageOptions;
         _appOptions = appOptions;
+        _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
 
         RunScanLabel = _localization["Dashboard.RunScan"];
         GeneratePdfLabel = _localization["Dashboard.GenerateReport"];
@@ -111,44 +105,48 @@ public partial class MainViewModel : ObservableObject
 
         Findings = new ObservableCollection<FindingItem>();
 
-        var cpu = new ObservableCollection<double>();
-        var ram = new ObservableCollection<double>();
-        var disk = new ObservableCollection<double>();
-
-        ResourceSeries = new ObservableCollection<ISeries>
-        {
-            new LineSeries<double> { Values = cpu, Name = "CPU", Fill = null, Stroke = new SolidColorPaint(new SKColor(0, 102, 255), 3) },
-            new LineSeries<double> { Values = ram, Name = "RAM", Fill = null, Stroke = new SolidColorPaint(new SKColor(16, 185, 129), 3) },
-            new LineSeries<double> { Values = disk, Name = "Disk", Fill = null, Stroke = new SolidColorPaint(new SKColor(249, 115, 22), 3) }
-        };
-
-        XAxes = [new Axis { Name = "Samples" }];
-        YAxes = [new Axis { Name = "%", MinLimit = 0, MaxLimit = 100 }];
-
         var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
         AppVersionString = version != null ? $"v{version.Major}.{version.Minor}.{version.Build}" : "Onbekend";
-
-        IsBusy = true;
-        _ = Task.Run(async () =>
-        {
-            await RefreshRuntimeSnapshotAsync();
-            System.Windows.Application.Current.Dispatcher.Invoke(() => IsBusy = false);
-            
-            _snapshotTimer = new System.Timers.Timer(5000);
-            _snapshotTimer.Elapsed += async (s, e) => {
-                try {
-                    await RefreshRuntimeSnapshotAsync();
-                } catch { }
-            };
-            _snapshotTimer.Start();
-        });
     }
 
     public ObservableCollection<FindingItem> Findings { get; }
 
-    public ObservableCollection<ISeries> ResourceSeries { get; }
-    public Axis[] XAxes { get; }
-    public Axis[] YAxes { get; }
+    public void StartMonitoring()
+    {
+        if (_monitoringStarted)
+        {
+            return;
+        }
+
+        _monitoringStarted = true;
+        _ = InitializeMonitoringAsync();
+    }
+
+    private async Task InitializeMonitoringAsync()
+    {
+        IsBusy = true;
+        try
+        {
+            await RefreshRuntimeSnapshotAsync();
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+
+        _snapshotTimer = new System.Timers.Timer(5000);
+        _snapshotTimer.Elapsed += (_, _) => _dispatcherQueue.TryEnqueue(async () =>
+        {
+            try
+            {
+                await RefreshRuntimeSnapshotAsync();
+            }
+            catch
+            {
+            }
+        });
+        _snapshotTimer.Start();
+    }
 
     [ObservableProperty] private string runScanLabel = string.Empty;
     [ObservableProperty] private string generatePdfLabel = string.Empty;
@@ -326,7 +324,7 @@ public partial class MainViewModel : ObservableObject
                     UseShellExecute = true
                 });
                 
-                System.Windows.Application.Current.Dispatcher.Invoke(() => System.Windows.Application.Current.Shutdown());
+                Microsoft.UI.Xaml.Application.Current.Exit();
                 return;
             }
             else
@@ -515,7 +513,7 @@ public partial class MainViewModel : ObservableObject
 
     private async Task ExecuteRemediationAsync(string actionKey, string confirmationText)
     {
-        if (!_confirmationDialog.Confirm(_localization["Action.ConfirmTitle"], confirmationText))
+        if (!await _confirmationDialog.ConfirmAsync(_localization["Action.ConfirmTitle"], confirmationText))
         {
             return;
         }
@@ -579,23 +577,6 @@ public partial class MainViewModel : ObservableObject
         GpuName = snapshot.GpuName;
         TotalRam = snapshot.TotalRam;
 
-        AppendSample(0, snapshot.CpuUsagePercent);
-        AppendSample(1, snapshot.RamUsagePercent);
-        AppendSample(2, snapshot.StorageUsagePercent);
         UpdateProcesses();
-    }
-
-    private void AppendSample(int seriesIndex, double value)
-    {
-        if (ResourceSeries[seriesIndex] is not LineSeries<double> line || line.Values is not ObservableCollection<double> values)
-        {
-            return;
-        }
-
-        values.Add(Math.Clamp(value, 0, 100));
-        if (values.Count > 24)
-        {
-            values.RemoveAt(0);
-        }
     }
 }

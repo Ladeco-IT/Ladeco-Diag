@@ -34,6 +34,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IDiagnosticModule, WindowsIntegrityModule>();
         services.AddScoped<IDiagnosticModule, SmartDiskDiagnosticsModule>();
         services.AddScoped<IDiagnosticModule, TemperatureDiagnosticsModule>();
+        services.AddScoped<IDiagnosticModule, PerformanceAndReliabilityModule>();
 
         return services;
     }

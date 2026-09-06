@@ -2,5 +2,5 @@ namespace Ladeco.Diag.App.Services;
 
 public interface IConfirmationDialogService
 {
-    bool Confirm(string title, string message);
+    Task<bool> ConfirmAsync(string title, string message);
 }

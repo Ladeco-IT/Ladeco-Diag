@@ -1,4 +1,4 @@
-using System.Windows;
+using Microsoft.UI.Xaml;
 using Ladeco.Diag.App.ViewModels;
 
 namespace Ladeco.Diag.App;
@@ -8,6 +8,8 @@ public partial class MainWindow : Window
     public MainWindow(MainViewModel viewModel)
     {
         InitializeComponent();
-        DataContext = viewModel;
+        Root.DataContext = viewModel;
+        Title = "Ladeco IT Diagnostic Tool";
+        Activated += (_, _) => viewModel.StartMonitoring();
     }
 }

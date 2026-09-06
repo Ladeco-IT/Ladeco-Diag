@@ -1,4 +1,4 @@
-using System.Windows;
+using Microsoft.UI.Xaml;
 using Ladeco.Diag.App.Models;
 using Ladeco.Diag.App.Services;
 using Ladeco.Diag.App.ViewModels;
@@ -17,11 +17,12 @@ using Serilog;
 
 namespace Ladeco.Diag.App;
 
-public partial class App : System.Windows.Application
+public partial class App : Microsoft.UI.Xaml.Application
 {
     private IHost? _host;
+    public static MainWindow? MainWindow { get; private set; }
 
-    protected override async void OnStartup(StartupEventArgs e)
+    protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
         var configuration = new ConfigurationBuilder()
             .SetBasePath(AppContext.BaseDirectory)
@@ -90,13 +91,12 @@ public partial class App : System.Windows.Application
             await db.Database.EnsureCreatedAsync();
         }
 
-        var window = _host.Services.GetRequiredService<MainWindow>();
-        window.Show();
-
-        base.OnStartup(e);
+        MainWindow = _host.Services.GetRequiredService<MainWindow>();
+        MainWindow.Closed += (_, _) => _ = StopHostAsync();
+        MainWindow.Activate();
     }
 
-    protected override async void OnExit(ExitEventArgs e)
+    private async Task StopHostAsync()
     {
         if (_host is not null)
         {
@@ -105,6 +105,5 @@ public partial class App : System.Windows.Application
         }
 
         Log.CloseAndFlush();
-        base.OnExit(e);
     }
 }

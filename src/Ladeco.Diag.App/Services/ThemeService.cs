@@ -1,30 +1,20 @@
-using System.Windows;
+using Microsoft.UI.Xaml;
 
 namespace Ladeco.Diag.App.Services;
 
 public sealed class ThemeService : IThemeService
 {
-    public void ApplyLightTheme() => Apply("Resources/Themes/LightTheme.xaml");
+    public void ApplyLightTheme() => Apply(ElementTheme.Light);
 
-    public void ApplyDarkTheme() => Apply("Resources/Themes/DarkTheme.xaml");
+    public void ApplyDarkTheme() => Apply(ElementTheme.Dark);
 
-    private static void Apply(string source)
+    private static void Apply(ElementTheme theme)
     {
-        var app = System.Windows.Application.Current;
-        if (app is null)
+        if (App.MainWindow?.Content is not FrameworkElement root)
         {
             return;
         }
 
-        var dictionaries = app.Resources.MergedDictionaries;
-        var existingTheme = dictionaries.FirstOrDefault(x => x.Source is not null &&
-                                                             (x.Source.OriginalString.EndsWith("LightTheme.xaml", StringComparison.OrdinalIgnoreCase) ||
-                                                              x.Source.OriginalString.EndsWith("DarkTheme.xaml", StringComparison.OrdinalIgnoreCase)));
-        if (existingTheme is not null)
-        {
-            dictionaries.Remove(existingTheme);
-        }
-
-        dictionaries.Add(new ResourceDictionary { Source = new Uri(source, UriKind.Relative) });
+        root.RequestedTheme = theme;
     }
 }

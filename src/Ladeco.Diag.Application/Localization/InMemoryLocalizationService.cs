@@ -27,6 +27,8 @@ public sealed class InMemoryLocalizationService : ILocalizationService
             ["Dashboard.Card.Network"] = "Netwerk",
             ["Dashboard.Card.Resources"] = "Resources",
             ["Action.ConfirmTitle"] = "Bevestiging",
+            ["Dialog.Yes"] = "Ja",
+            ["Dialog.No"] = "Nee",
             ["Action.ScanFirst"] = "Voer eerst een scan uit.",
             ["Action.Success"] = "Actie geslaagd",
             ["Action.Failed"] = "Actie mislukt",
