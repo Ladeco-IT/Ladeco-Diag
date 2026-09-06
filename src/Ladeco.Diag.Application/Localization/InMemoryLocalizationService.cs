@@ -46,7 +46,7 @@ public sealed class InMemoryLocalizationService : ILocalizationService
             ["Action.CleanTemp"] = "Tijdelijke bestanden verwijderen?",
             ["Action.CleanCache"] = "Windows cache opruimen?",
             ["Action.CpuStressTest"] = "CPU-test starten? Deze begrensde Windows-beoordeling belast de processor tijdelijk.",
-            ["Action.GpuStressTest"] = "GPU-test starten? Deze begrensde Windows-beoordeling belast de grafische kaart tijdelijk.",
+            ["Action.GpuStressTest"] = "GPU-compositietest starten? Deze begrensde Windows-beoordeling test de stabiliteit van Windows Desktop Window Manager en belast de grafische kaart tijdelijk.",
             ["Action.MemoryTest"] = "Geheugentest starten? Deze begrensde Windows-beoordeling meet de geheugenprestatie.",
             ["Action.DiskReadTest"] = "Schijfleestest starten? Deze test leest de systeemschijf en belast deze tijdelijk.",
             ["Action.Reboot"] = "Systeem opnieuw opstarten in 15 seconden?",

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net.Http;
 using System.Text;
 
 namespace Ladeco.Diag.App.Services;
@@ -43,11 +44,11 @@ public sealed class RemediationService : IRemediationService
             try
             {
                 progress?.Report("Speedtest: download wordt gestart...\n");
+                using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
                 var timerDL = Stopwatch.StartNew();
-                var reqDL = System.Net.WebRequest.Create("http://speedtest.tele2.net/100MB.zip");
-                reqDL.Timeout = 10000;
-                using var respDL = await reqDL.GetResponseAsync();
-                using var streamDL = respDL.GetResponseStream();
+                using var response = await client.GetAsync("http://speedtest.tele2.net/100MB.zip", HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                response.EnsureSuccessStatusCode();
+                using var streamDL = await response.Content.ReadAsStreamAsync(cancellationToken);
                 var buffer = new byte[81920];
                 long totalBytesDL = 0;
                 while (timerDL.Elapsed.TotalSeconds < 8)
@@ -61,16 +62,10 @@ public sealed class RemediationService : IRemediationService
 
                 progress?.Report($"Download afgerond: {dlMbps:N2} Mbps\nSpeedtest: upload wordt gestart...\n");
                 var timerUL = Stopwatch.StartNew();
-                var reqUL = System.Net.WebRequest.Create("http://speedtest.tele2.net/upload.php");
-                reqUL.Method = "POST";
-                reqUL.Timeout = 10000;
                 var dataUL = new byte[2 * 1024 * 1024];
-                reqUL.ContentLength = dataUL.Length;
-                using (var streamUL = reqUL.GetRequestStream())
-                {
-                    await streamUL.WriteAsync(dataUL, 0, dataUL.Length, cancellationToken);
-                }
-                using var respUL = await reqUL.GetResponseAsync();
+                using var uploadContent = new ByteArrayContent(dataUL);
+                using var uploadResponse = await client.PostAsync("http://speedtest.tele2.net/upload.php", uploadContent, cancellationToken);
+                uploadResponse.EnsureSuccessStatusCode();
                 timerUL.Stop();
                 double ulMbps = (dataUL.Length * 8.0 / 1000000.0) / timerUL.Elapsed.TotalSeconds;
 

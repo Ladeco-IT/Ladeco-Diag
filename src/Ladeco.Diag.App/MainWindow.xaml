@@ -1,7 +1,7 @@
 <Window x:Class="Ladeco.Diag.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Grid x:Name="Root" Padding="24" RowSpacing="16">
+    <Grid x:Name="Root" Padding="24" RowSpacing="16" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -207,7 +207,7 @@
                             <TextBlock Text="De tests zijn begrensde Windows-beoordelingen. Sluit zware toepassingen voordat u een test start." TextWrapping="Wrap" Opacity="0.7" />
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <Button Content="CPU-test" Command="{Binding RunCpuStressTestCommand}" />
-                                <Button Content="GPU-test" Command="{Binding RunGpuStressTestCommand}" />
+                                <Button Content="GPU-compositietest" Command="{Binding RunGpuStressTestCommand}" />
                                 <Button Content="Geheugentest" Command="{Binding RunMemoryTestCommand}" />
                                 <Button Content="Schijfleestest" Command="{Binding RunDiskReadTestCommand}" />
                             </StackPanel>

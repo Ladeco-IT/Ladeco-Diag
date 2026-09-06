@@ -33,6 +33,24 @@ public sealed class WindowsIntegrityModule : IDiagnosticModule
                 "Makkelijk"));
         }
 
+            var restartRequired = IsWindowsUpdateRestartRequired();
+            measurements["WindowsUpdateRestartRequired"] = restartRequired ? "Yes" : "No";
+            if (restartRequired)
+            {
+                findings.Add(new Finding(
+                "WINDOWS_UPDATE_RESTART_REQUIRED",
+                "Windows Update wacht op herstart",
+                "Een geïnstalleerde Windows-update is pas volledig actief na een herstart.",
+                "Windows Update heeft bestanden of systeemcomponenten gepland voor vervanging.",
+                "Sla uw werk op en herstart de computer om de update af te ronden.",
+                DiagnosticSeverity.Medium,
+                70,
+                true,
+                "shutdown /r /t 15",
+                10,
+                "Makkelijk"));
+            }
+
         var firewallEnabled = ReadFirewallEnabled();
         measurements["FirewallEnabled"] = firewallEnabled ? "Yes" : "No";
         if (!firewallEnabled)
@@ -94,6 +112,20 @@ public sealed class WindowsIntegrityModule : IDiagnosticModule
             using var key = Registry.LocalMachine.OpenSubKey(path);
             var enabled = key?.GetValue("EnableFirewall");
             return Convert.ToInt32(enabled ?? 0) == 1;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool IsWindowsUpdateRestartRequired()
+    {
+        try
+        {
+            const string path = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WindowsUpdate\\Auto Update\\RebootRequired";
+            using var key = Registry.LocalMachine.OpenSubKey(path);
+            return key is not null;
         }
         catch
         {
