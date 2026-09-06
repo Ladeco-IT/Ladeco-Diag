@@ -5,7 +5,6 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <Grid ColumnSpacing="16">
@@ -13,14 +12,22 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <StackPanel Spacing="4">
-                <TextBlock Text="Ladeco IT Diagnostic Tool" Style="{StaticResource TitleTextBlockStyle}" />
-                <TextBlock Text="{Binding StatusText}" />
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <Image Source="ms-appx:///Resources/Images/Logo.png" Width="48" Height="48" Stretch="Uniform" />
+                <StackPanel Spacing="4" VerticalAlignment="Center">
+                    <TextBlock Text="Ladeco IT Diagnostic Tool" Style="{StaticResource TitleTextBlockStyle}" />
+                    <TextBlock Text="{Binding StatusText}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ProgressRing Width="18" Height="18" IsActive="{Binding IsBusy}" />
+                        <TextBlock Text="{Binding InitializationStatus}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                 <Button Content="{Binding RunScanLabel}" Command="{Binding RunScanCommand}" />
                 <Button Content="{Binding GeneratePdfLabel}" Command="{Binding GeneratePdfCommand}" />
                 <Button Content="PDF openen" Command="{Binding OpenPdfCommand}" />
+                <Button Content="Actie openen" Command="{Binding OpenActionOverlayCommand}" />
                 <Button Content="Licht" Command="{Binding LightThemeCommand}" />
                 <Button Content="Donker" Command="{Binding DarkThemeCommand}" />
             </StackPanel>
@@ -34,9 +41,9 @@
                         <TextBlock Text="{Binding ComputerName}" />
                         <TextBlock Text="{Binding WindowsVersion}" />
                         <TextBlock Text="{Binding CpuName}" TextWrapping="Wrap" />
-                        <TextBlock Text="CPU: {Binding CpuUsageDisplay}" />
-                        <TextBlock Text="RAM: {Binding RamUsageDisplay}" />
-                        <TextBlock Text="Opslag: {Binding StorageUsageDisplay}" />
+                        <StackPanel Orientation="Horizontal" Spacing="6"><TextBlock Text="CPU:" /><TextBlock Text="{Binding CpuUsageDisplay}" FontWeight="SemiBold" /></StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="6"><TextBlock Text="RAM:" /><TextBlock Text="{Binding RamUsageDisplay}" FontWeight="SemiBold" /></StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="6"><TextBlock Text="Opslag:" /><TextBlock Text="{Binding StorageUsageDisplay}" FontWeight="SemiBold" /></StackPanel>
                         <TextBlock Text="{Binding RecentScanSummary}" TextWrapping="Wrap" />
                         <TextBlock Text="Diagnostische bevindingen" Style="{StaticResource SubtitleTextBlockStyle}" />
                         <ListView ItemsSource="{Binding Findings}" SelectionMode="None">
@@ -55,26 +62,62 @@
                 </ScrollViewer>
             </TabViewItem>
             <TabViewItem Header="Netwerk" IsClosable="False">
-                <StackPanel Padding="0,16" Spacing="12">
-                    <TextBlock Text="{Binding InternetStatus}" />
-                    <TextBlock Text="{Binding InternetLatency}" />
-                    <TextBlock Text="{Binding NetworkType}" />
-                    <TextBlock Text="{Binding WifiSignalStrength}" />
-                    <TextBlock Text="{Binding NetworkSpeed}" />
-                    <TextBlock Text="{Binding IpAddress}" />
-                    <TextBlock Text="{Binding PublicIpAddress}" />
-                </StackPanel>
+                <ScrollViewer>
+                    <StackPanel Padding="0,16" Spacing="12">
+                        <TextBlock Text="Verbinding" Style="{StaticResource SubtitleTextBlockStyle}" />
+                        <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="12">
+                            <Grid RowSpacing="8" ColumnSpacing="16">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                                <TextBlock Text="Internetstatus" /><TextBlock Grid.Column="1" Text="{Binding InternetStatus}" FontWeight="SemiBold" />
+                                <TextBlock Grid.Row="1" Text="Latency" /><TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding InternetLatency}" />
+                                <TextBlock Grid.Row="2" Text="Netwerktype" /><TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding NetworkType}" />
+                                <TextBlock Grid.Row="3" Text="Lokale snelheid" /><TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding NetworkSpeed}" />
+                                <TextBlock Grid.Row="4" Text="Lokaal IPv4" /><TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding IpAddress}" />
+                                <TextBlock Grid.Row="5" Text="Publiek IPv4" /><TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding PublicIpAddress}" />
+                            </Grid>
+                        </Border>
+                        <TextBlock Text="Wi-Fi kwaliteit" Style="{StaticResource SubtitleTextBlockStyle}" />
+                        <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="12">
+                            <Grid RowSpacing="8" ColumnSpacing="16">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                                <TextBlock Text="SSID" /><TextBlock Grid.Column="1" Text="{Binding WifiSsid}" FontWeight="SemiBold" />
+                                <TextBlock Grid.Row="1" Text="Signaalsterkte" /><TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding WifiSignalStrength}" />
+                                <TextBlock Grid.Row="2" Text="Kanaal" /><TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding WifiChannel}" />
+                                <TextBlock Grid.Row="3" Text="Radiotype" /><TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding WifiRadioType}" />
+                            </Grid>
+                        </Border>
+                        <TextBlock Text="DNS-servers" Style="{StaticResource SubtitleTextBlockStyle}" />
+                        <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="12"><TextBlock Text="{Binding DnsServers}" TextWrapping="Wrap" /></Border>
+                    </StackPanel>
+                </ScrollViewer>
             </TabViewItem>
             <TabViewItem Header="Hardware" IsClosable="False">
                 <ScrollViewer>
                     <StackPanel Padding="0,16" Spacing="12">
                         <Button Content="Hardware opnieuw laden" Command="{Binding LoadHardwareCommand}" HorizontalAlignment="Left" />
-                        <TextBlock Text="{Binding HardwareMotherboard}" TextWrapping="Wrap" />
-                        <TextBlock Text="{Binding HardwareBios}" TextWrapping="Wrap" />
-                        <TextBlock Text="{Binding HardwareStorage}" TextWrapping="Wrap" />
-                        <TextBlock Text="{Binding HardwareNetworkAdapters}" TextWrapping="Wrap" />
-                        <TextBlock Text="{Binding HardwareMonitors}" TextWrapping="Wrap" />
-                        <TextBlock Text="{Binding HardwarePrinters}" TextWrapping="Wrap" />
+                        <TextBlock Text="Systeem" Style="{StaticResource SubtitleTextBlockStyle}" />
+                        <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="12"><StackPanel Spacing="6"><TextBlock Text="{Binding HardwareSystemDetails}" TextWrapping="Wrap" /><TextBlock Text="{Binding HardwareMotherboard}" TextWrapping="Wrap" /><TextBlock Text="{Binding HardwareBios}" TextWrapping="Wrap" /><TextBlock Text="{Binding HardwareSerials}" TextWrapping="Wrap" /></StackPanel></Border>
+                        <TextBlock Text="Geheugen en grafische kaart" Style="{StaticResource SubtitleTextBlockStyle}" />
+                        <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="12"><StackPanel Spacing="6"><TextBlock Text="{Binding TotalRam}" FontWeight="SemiBold" /><TextBlock Text="{Binding HardwareMemoryModules}" TextWrapping="Wrap" /><TextBlock Text="{Binding HardwareGpuDetails}" TextWrapping="Wrap" /></StackPanel></Border>
+                        <TextBlock Text="Live telemetrie" Style="{StaticResource SubtitleTextBlockStyle}" />
+                        <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="12">
+                            <Grid RowSpacing="8" ColumnSpacing="16">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                                <TextBlock Text="CPU-temperatuur" /><TextBlock Grid.Column="1" Text="{Binding LiveCpuTemperature}" FontWeight="SemiBold" />
+                                <TextBlock Grid.Column="2" Text="CPU-vermogen" /><TextBlock Grid.Column="3" Text="{Binding LiveCpuPower}" FontWeight="SemiBold" />
+                                <TextBlock Grid.Row="1" Text="GPU-temperatuur" /><TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding LiveGpuTemperature}" FontWeight="SemiBold" />
+                                <TextBlock Grid.Row="1" Grid.Column="2" Text="GPU-vermogen" /><TextBlock Grid.Row="1" Grid.Column="3" Text="{Binding LiveGpuPower}" FontWeight="SemiBold" />
+                                <TextBlock Grid.Row="2" Text="Schijftemperatuur" /><TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding LiveStorageTemperature}" />
+                                <TextBlock Grid.Row="2" Grid.Column="2" Text="Ventilatoren" /><TextBlock Grid.Row="2" Grid.Column="3" Text="{Binding LiveFanSpeeds}" TextWrapping="Wrap" />
+                            </Grid>
+                        </Border>
+                        <TextBlock Text="Schijfgezondheid" Style="{StaticResource SubtitleTextBlockStyle}" />
+                        <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="12"><StackPanel Spacing="6"><TextBlock Text="{Binding HardwareDiskHealth}" TextWrapping="Wrap" /><TextBlock Text="{Binding HardwareStorage}" TextWrapping="Wrap" Opacity="0.7" /></StackPanel></Border>
+                        <TextBlock Text="Apparaten" Style="{StaticResource SubtitleTextBlockStyle}" />
+                        <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="12"><StackPanel Spacing="6"><TextBlock Text="{Binding HardwareNetworkAdapters}" TextWrapping="Wrap" /><TextBlock Text="{Binding HardwareMonitors}" TextWrapping="Wrap" /><TextBlock Text="{Binding HardwareAudio}" TextWrapping="Wrap" /><TextBlock Text="{Binding HardwarePrinters}" TextWrapping="Wrap" /></StackPanel></Border>
                     </StackPanel>
                 </ScrollViewer>
             </TabViewItem>
@@ -86,11 +129,33 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel Spacing="8">
                         <TextBlock Text="Zwaarste processen" Style="{StaticResource SubtitleTextBlockStyle}" />
-                        <ListView ItemsSource="{Binding RunningProcesses}" />
+                        <ListView ItemsSource="{Binding RunningProcesses}" SelectionMode="None">
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Padding="6" ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1" Text="{Binding MemoryUsage}" VerticalAlignment="Center" />
+                                        <Button Grid.Column="2" Content="Stop" Command="{Binding StopCommand}" CommandParameter="{Binding}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
                     </StackPanel>
                     <StackPanel Grid.Column="1" Spacing="8">
-                        <Button Content="Services vernieuwen" Command="{Binding LoadStartupServicesCommand}" HorizontalAlignment="Left" />
-                        <ListView ItemsSource="{Binding StartupServices}" />
+                        <TextBlock Text="Opstartprogramma's" Style="{StaticResource SubtitleTextBlockStyle}" />
+                        <ListView ItemsSource="{Binding StartupApplications}" SelectionMode="None">
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Padding="6" ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                        <StackPanel><TextBlock Text="{Binding Name}" /><TextBlock Text="{Binding Command}" TextTrimming="CharacterEllipsis" Opacity="0.7" /></StackPanel>
+                                        <TextBlock Grid.Column="1" Text="{Binding IsEnabled}" VerticalAlignment="Center" />
+                                        <Button Grid.Column="2" Content="Wijzigen" Command="{Binding ToggleCommand}" CommandParameter="{Binding}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
                     </StackPanel>
                 </Grid>
             </TabViewItem>
@@ -137,14 +202,20 @@
                                 <Button Content="Computer herstarten" Command="{Binding RebootSystemCommand}" />
                             </StackPanel>
                         </StackPanel>
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Prestatietests" Style="{StaticResource SubtitleTextBlockStyle}" />
+                            <TextBlock Text="De tests zijn begrensde Windows-beoordelingen. Sluit zware toepassingen voordat u een test start." TextWrapping="Wrap" Opacity="0.7" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Content="CPU-test" Command="{Binding RunCpuStressTestCommand}" />
+                                <Button Content="GPU-test" Command="{Binding RunGpuStressTestCommand}" />
+                                <Button Content="Geheugentest" Command="{Binding RunMemoryTestCommand}" />
+                                <Button Content="Schijfleestest" Command="{Binding RunDiskReadTestCommand}" />
+                            </StackPanel>
+                        </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
             </TabViewItem>
         </TabView>
 
-        <StackPanel Grid.Row="2" Spacing="8">
-            <TextBlock Text="Actie-uitvoer" Style="{StaticResource SubtitleTextBlockStyle}" />
-            <TextBox Text="{Binding ActionOutput}" IsReadOnly="True" TextWrapping="Wrap" MinHeight="52" />
-        </StackPanel>
     </Grid>
 </Window>

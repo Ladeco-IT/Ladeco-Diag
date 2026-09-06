@@ -20,6 +20,7 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<ISystemSnapshotProvider, SystemSnapshotProvider>();
         services.AddSingleton<IHardwareInventoryProvider, HardwareInventoryProvider>();
+        services.AddSingleton<IHardwareTelemetryProvider, LibreHardwareTelemetryProvider>();
         services.AddScoped<IScanHistoryRepository, ScanHistoryRepository>();
 
         services.AddScoped<IDiagnosticModule, SystemHealthModule>();

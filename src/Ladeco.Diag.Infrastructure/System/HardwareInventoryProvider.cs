@@ -12,7 +12,25 @@ public sealed class HardwareInventoryProvider : IHardwareInventoryProvider
         var bios = ReadSingle("SELECT SMBIOSBIOSVersion FROM Win32_BIOS", x => x["SMBIOSBIOSVersion"]?.ToString());
         var cpu = ReadSingle("SELECT Name FROM Win32_Processor", x => x["Name"]?.ToString());
         var gpu = ReadMany("SELECT Name FROM Win32_VideoController", x => x["Name"]?.ToString());
+        var gpuDetails = ReadMany("SELECT Name,DriverVersion,AdapterRAM,VideoProcessor FROM Win32_VideoController", x =>
+        {
+            var name = x["Name"]?.ToString() ?? "Unknown";
+            var driver = x["DriverVersion"]?.ToString() ?? "Unknown driver";
+            var vram = x["AdapterRAM"] is null ? "Unknown VRAM" : $"{Math.Round(Convert.ToDouble(x["AdapterRAM"]) / 1024 / 1024 / 1024, 1)} GB VRAM";
+            var processor = x["VideoProcessor"]?.ToString() ?? "Unknown processor";
+            return $"{name} | {vram} | Driver {driver} | {processor}";
+        }, 4);
         var totalRam = ReadTotalRam();
+        var memoryModules = ReadMany("SELECT Capacity,Speed,Manufacturer,PartNumber FROM Win32_PhysicalMemory", x =>
+        {
+            var capacity = x["Capacity"] is null ? "? GB" : $"{Math.Round(Convert.ToDouble(x["Capacity"]) / 1024 / 1024 / 1024, 0)} GB";
+            var speed = x["Speed"]?.ToString() ?? "?";
+            var manufacturer = x["Manufacturer"]?.ToString()?.Trim() ?? "Unknown";
+            var partNumber = x["PartNumber"]?.ToString()?.Trim() ?? "";
+            return $"{capacity} | {speed} MHz | {manufacturer} {partNumber}".Trim();
+        }, 8, "\n");
+        var systemDetails = ReadSingle("SELECT Manufacturer,Model,SystemType FROM Win32_ComputerSystem", x =>
+            $"{x["Manufacturer"]} {x["Model"]} | {x["SystemType"]}") ?? "Unavailable";
         var storage = ReadMany("SELECT Model,MediaType,Size FROM Win32_DiskDrive", x =>
         {
             var model = x["Model"]?.ToString() ?? "Unknown";
@@ -55,7 +73,11 @@ public sealed class HardwareInventoryProvider : IHardwareInventoryProvider
             mics,
             string.IsNullOrWhiteSpace(touchscreen) ? "No" : "Yes",
             docks,
-            serials);
+            serials,
+            systemDetails,
+            memoryModules,
+            gpuDetails,
+            ReadStorageDetails());
 
         return Task.FromResult(report);
     }

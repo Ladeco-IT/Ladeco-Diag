@@ -18,5 +18,9 @@ public sealed record HardwareInventoryReport(
     string Microphones,
     string Touchscreen,
     string DockingStations,
-    string SerialNumbers
+    string SerialNumbers,
+    string SystemDetails,
+    string MemoryModules,
+    string GpuDetails,
+    string DiskHealth
 );

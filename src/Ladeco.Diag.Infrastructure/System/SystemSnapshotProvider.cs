@@ -24,7 +24,7 @@ public sealed class SystemSnapshotProvider : ISystemSnapshotProvider
         var ramUsage = ReadRamUsage();
         var storageUsage = ReadStorageUsage();
 
-        var (netType, wifiSignal) = ReadWirelessInfo();
+        var (netType, wifiSignal, wifiSsid, wifiChannel, wifiRadioType) = ReadWirelessInfo();
 
         var cpuName = ReadHardwareInfo("Win32_Processor", "Name").FirstOrDefault() ?? "Onbekende CPU";
         var gpuName = string.Join(" | ", ReadHardwareInfo("Win32_VideoController", "Name"));
@@ -62,7 +62,11 @@ public sealed class SystemSnapshotProvider : ISystemSnapshotProvider
             CpuName: cpuName,
             GpuName: gpuName,
             TotalRam: totalRamStr,
-            LatencyMs: ReadLatency());
+            LatencyMs: ReadLatency(),
+            WifiSsid: wifiSsid,
+            WifiChannel: wifiChannel,
+            WifiRadioType: wifiRadioType,
+            DnsServers: ReadDnsServers());
     }
 
     private static long ReadLatency()
@@ -96,7 +100,7 @@ public sealed class SystemSnapshotProvider : ISystemSnapshotProvider
         return results;
     }
 
-    private static (string Type, string Signal) ReadWirelessInfo()
+    private static (string Type, string Signal, string Ssid, string Channel, string RadioType) ReadWirelessInfo()
     {
         try
         {
@@ -105,7 +109,7 @@ public sealed class SystemSnapshotProvider : ISystemSnapshotProvider
                 
             if (!isWifi)
             {
-                return ("Ethernet (Bekabeld)", "N/A");
+                return ("Ethernet (Bekabeld)", "N/A", "N/A", "N/A", "N/A");
             }
             
             var process = new Process
@@ -125,17 +129,19 @@ public sealed class SystemSnapshotProvider : ISystemSnapshotProvider
 
             var lines = output.Split('\n');
             var signalLine = lines.FirstOrDefault(l => l.Contains("Signal") || l.Contains("Signaal"));
+            var ssidLine = lines.FirstOrDefault(l => l.TrimStart().StartsWith("SSID", StringComparison.OrdinalIgnoreCase) && !l.Contains("BSSID", StringComparison.OrdinalIgnoreCase));
+            var channelLine = lines.FirstOrDefault(l => l.TrimStart().StartsWith("Channel", StringComparison.OrdinalIgnoreCase) || l.TrimStart().StartsWith("Kanaal", StringComparison.OrdinalIgnoreCase));
+            var radioLine = lines.FirstOrDefault(l => l.TrimStart().StartsWith("Radio type", StringComparison.OrdinalIgnoreCase) || l.TrimStart().StartsWith("Radiotype", StringComparison.OrdinalIgnoreCase));
+            var ssid = ReadNetshValue(ssidLine);
+            var channel = ReadNetshValue(channelLine);
+            var radioType = ReadNetshValue(radioLine);
             if (signalLine != null)
             {
-                var parts = signalLine.Split(':');
-                if (parts.Length > 1)
+                var signalStr = ReadNetshValue(signalLine).Replace("%", "");
+                if (int.TryParse(signalStr, out int signalPercent))
                 {
-                    var signalStr = parts[1].Trim().Replace("%", "");
-                    if (int.TryParse(signalStr, out int signalPercent))
-                    {
-                        var quality = signalPercent > 80 ? "Uitstekend" : signalPercent > 60 ? "Goed" : signalPercent > 40 ? "Matig" : "Zwak";
-                        return ("WiFi (Draadloos)", $"{signalPercent}% ({quality})");
-                    }
+                    var quality = signalPercent > 80 ? "Uitstekend" : signalPercent > 60 ? "Goed" : signalPercent > 40 ? "Matig" : "Zwak";
+                    return ("WiFi (Draadloos)", $"{signalPercent}% ({quality})", ssid, channel, radioType);
                 }
             }
         }
@@ -144,7 +150,32 @@ public sealed class SystemSnapshotProvider : ISystemSnapshotProvider
             // Ignored, fallback below
         }
 
-        return ("Ethernet (Bekabeld)", "N/A");
+        return ("WiFi (Draadloos)", "Onbekend", "Onbekend", "Onbekend", "Onbekend");
+    }
+
+    private static string ReadNetshValue(string? line)
+    {
+        var separator = line?.IndexOf(':') ?? -1;
+        return separator >= 0 ? line![(separator + 1)..].Trim() : "Onbekend";
+    }
+
+    private static string ReadDnsServers()
+    {
+        try
+        {
+            var servers = NetworkInterface.GetAllNetworkInterfaces()
+                .Where(network => network.OperationalStatus == OperationalStatus.Up && network.NetworkInterfaceType != NetworkInterfaceType.Loopback)
+                .SelectMany(network => network.GetIPProperties().DnsAddresses)
+                .Where(address => address.AddressFamily == AddressFamily.InterNetwork)
+                .Select(address => address.ToString())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            return servers.Count == 0 ? "N/A" : string.Join(", ", servers);
+        }
+        catch
+        {
+            return "N/A";
+        }
     }
 
     private static string ReadNetworkSpeed()

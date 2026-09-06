@@ -25,5 +25,9 @@ public sealed record RuntimeSnapshot(
     string CpuName,
     string GpuName,
     string TotalRam,
-    long LatencyMs
+    long LatencyMs,
+    string WifiSsid,
+    string WifiChannel,
+    string WifiRadioType,
+    string DnsServers
 );

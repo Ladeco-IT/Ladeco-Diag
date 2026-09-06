@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 
 namespace Ladeco.Diag.App.Services;
 
@@ -24,16 +25,24 @@ public sealed class RemediationService : IRemediationService
         ["DefragDrive"] = "defrag C: /O",
         ["FullDebloat"] = "powershell -NoProfile -Command \"Get-AppxPackage -AllUsers | Where-Object {$_.IsFramework -eq $false -and $_.NonRemovable -eq $false -and $_.PackageFullName -notmatch 'Microsoft.WindowsStore'} | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue\"",
         ["RunSpeedtest"] = "powershell -NoProfile -Command \"Invoke-WebRequest 'https://raw.githubusercontent.com/sivel/speedtest-cli/master/speedtest.py' -OutFile speedtest.py; python speedtest.py; Remove-Item speedtest.py -ErrorAction SilentlyContinue\"",
+        ["RunCpuStressTest"] = "winsat cpuformal",
+        ["RunGpuStressTest"] = "winsat dwmformal",
+        ["RunMemoryTest"] = "winsat mem",
+        ["RunDiskReadTest"] = "winsat disk -drive C -seq -read -count 3",
         ["ClearEventLogs"] = "powershell -NoProfile -Command \"Get-EventLog -LogName * | ForEach { Clear-EventLog $_.Log }\"",
         ["RebootSystem"] = "shutdown /r /t 15 /c \"Ladeco IT Diagnostic reboot\""
     };
 
-    public async Task<(bool Success, string Output)> RunSafeActionAsync(string actionKey, CancellationToken cancellationToken = default)
+    public async Task<(bool Success, string Output)> RunSafeActionAsync(
+        string actionKey,
+        IProgress<string>? progress = null,
+        CancellationToken cancellationToken = default)
     {
         if (actionKey.Equals("RunSpeedtest", StringComparison.OrdinalIgnoreCase))
         {
             try
             {
+                progress?.Report("Speedtest: download wordt gestart...\n");
                 var timerDL = Stopwatch.StartNew();
                 var reqDL = System.Net.WebRequest.Create("http://speedtest.tele2.net/100MB.zip");
                 reqDL.Timeout = 10000;
@@ -50,7 +59,7 @@ public sealed class RemediationService : IRemediationService
                 timerDL.Stop();
                 double dlMbps = (totalBytesDL * 8.0 / 1000000.0) / timerDL.Elapsed.TotalSeconds;
 
-                // Upload Test
+                progress?.Report($"Download afgerond: {dlMbps:N2} Mbps\nSpeedtest: upload wordt gestart...\n");
                 var timerUL = Stopwatch.StartNew();
                 var reqUL = System.Net.WebRequest.Create("http://speedtest.tele2.net/upload.php");
                 reqUL.Method = "POST";
@@ -65,6 +74,7 @@ public sealed class RemediationService : IRemediationService
                 timerUL.Stop();
                 double ulMbps = (dataUL.Length * 8.0 / 1000000.0) / timerUL.Elapsed.TotalSeconds;
 
+                progress?.Report($"Upload afgerond: {ulMbps:N2} Mbps\n");
                 return (true, $"Download: {dlMbps:N2} Mbps | Upload: {ulMbps:N2} Mbps");
             }
             catch (Exception ex)
@@ -93,8 +103,8 @@ public sealed class RemediationService : IRemediationService
 
         try
         {
-            var stdOutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-            var stdErrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+            var stdOutTask = ReadStreamAsync(process.StandardOutput, progress, cancellationToken);
+            var stdErrTask = ReadStreamAsync(process.StandardError, progress, cancellationToken);
             await process.WaitForExitAsync(cancellationToken);
 
             var stdOut = await stdOutTask;
@@ -110,6 +120,25 @@ public sealed class RemediationService : IRemediationService
             try { process.Kill(true); } catch { }
             return (false, "Actie werd geannuleerd.");
         }
+    }
+
+    private static async Task<string> ReadStreamAsync(
+        StreamReader stream,
+        IProgress<string>? progress,
+        CancellationToken cancellationToken)
+    {
+        var output = new StringBuilder();
+        var buffer = new char[512];
+        int read;
+
+        while ((read = await stream.ReadAsync(buffer, cancellationToken)) > 0)
+        {
+            var chunk = new string(buffer, 0, read);
+            output.Append(chunk);
+            progress?.Report(chunk);
+        }
+
+        return output.ToString();
     }
 }
 

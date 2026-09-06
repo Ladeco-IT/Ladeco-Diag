@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Ladeco.Diag.App.Models;
@@ -11,6 +12,7 @@ using Ladeco.Diag.Application.Abstractions;
 using Ladeco.Diag.Domain.Diagnostics;
 using Ladeco.Diag.Reporting.Abstractions;
 using Microsoft.UI.Dispatching;
+using Microsoft.Win32;
 namespace Ladeco.Diag.App.ViewModels;
 
 public partial class MainViewModel : ObservableObject
@@ -18,6 +20,7 @@ public partial class MainViewModel : ObservableObject
     private readonly IDiagnosticsOrchestrator _orchestrator;
     private readonly ISystemSnapshotProvider _snapshotProvider;
     private readonly IHardwareInventoryProvider _hardwareInventoryProvider;
+    private readonly IHardwareTelemetryProvider _hardwareTelemetryProvider;
     private readonly IReportExporter _reportExporter;
     private readonly IThemeService _themeService;
     private readonly IConfirmationDialogService _confirmationDialog;
@@ -50,16 +53,24 @@ public partial class MainViewModel : ObservableObject
         catch { /* Must run as admin to see all, ignore errors for now */ }
     }
 
-   [ObservableProperty] private ObservableCollection<string> runningProcesses = new();
+    [ObservableProperty] private ObservableCollection<BackgroundProcessItem> runningProcesses = new();
+    [ObservableProperty] private ObservableCollection<StartupApplicationItem> startupApplications = new();
 
     private void UpdateProcesses()
     {
         try
         {
             var processes = System.Diagnostics.Process.GetProcesses()
+                .Where(process => process.Id != Environment.ProcessId &&
+                                  !process.ProcessName.Equals("LadecoDiag", StringComparison.OrdinalIgnoreCase) &&
+                                  process.SessionId == Process.GetCurrentProcess().SessionId)
                 .OrderByDescending(p => p.WorkingSet64)
                 .Take(15)
-                .Select(p => $"{p.ProcessName} ({Math.Round(p.WorkingSet64 / 1024.0 / 1024.0, 1)} MB)");
+                .Select(p => new BackgroundProcessItem(
+                    p.Id,
+                    p.ProcessName,
+                    $"{Math.Round(p.WorkingSet64 / 1024.0 / 1024.0, 1)} MB",
+                    StopProcessCommand));
             
             RunningProcesses.Clear();
             foreach (var p in processes) RunningProcesses.Add(p);
@@ -73,6 +84,7 @@ public partial class MainViewModel : ObservableObject
         IDiagnosticsOrchestrator orchestrator,
         ISystemSnapshotProvider snapshotProvider,
         IHardwareInventoryProvider hardwareInventoryProvider,
+        IHardwareTelemetryProvider hardwareTelemetryProvider,
         IReportExporter reportExporter,
         IThemeService themeService,
         IConfirmationDialogService confirmationDialog,
@@ -86,6 +98,7 @@ public partial class MainViewModel : ObservableObject
         _orchestrator = orchestrator;
         _snapshotProvider = snapshotProvider;
         _hardwareInventoryProvider = hardwareInventoryProvider;
+        _hardwareTelemetryProvider = hardwareTelemetryProvider;
         _reportExporter = reportExporter;
         _themeService = themeService;
         _confirmationDialog = confirmationDialog;
@@ -125,13 +138,17 @@ public partial class MainViewModel : ObservableObject
     private async Task InitializeMonitoringAsync()
     {
         IsBusy = true;
+        InitializationStatus = "Systeemgegevens worden opgehaald...";
         try
         {
             await RefreshRuntimeSnapshotAsync();
+            await LoadHardwareAsync();
+            LoadStartupApplications();
         }
         finally
         {
             IsBusy = false;
+            InitializationStatus = string.Empty;
         }
 
         _snapshotTimer = new System.Timers.Timer(5000);
@@ -191,6 +208,20 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string hardwareCameras = "-";
     [ObservableProperty] private string hardwareMics = "-";
     [ObservableProperty] private string hardwareSerials = "-";
+    [ObservableProperty] private string hardwareSystemDetails = "-";
+    [ObservableProperty] private string hardwareMemoryModules = "-";
+    [ObservableProperty] private string hardwareGpuDetails = "-";
+    [ObservableProperty] private string hardwareDiskHealth = "-";
+    [ObservableProperty] private string wifiSsid = "-";
+    [ObservableProperty] private string wifiChannel = "-";
+    [ObservableProperty] private string wifiRadioType = "-";
+    [ObservableProperty] private string dnsServers = "-";
+    [ObservableProperty] private string liveCpuTemperature = "Niet beschikbaar";
+    [ObservableProperty] private string liveCpuPower = "Niet beschikbaar";
+    [ObservableProperty] private string liveGpuTemperature = "Niet beschikbaar";
+    [ObservableProperty] private string liveGpuPower = "Niet beschikbaar";
+    [ObservableProperty] private string liveFanSpeeds = "Niet beschikbaar";
+    [ObservableProperty] private string liveStorageTemperature = "Niet beschikbaar";
     [ObservableProperty] private string recentScanSummary = string.Empty;
     [ObservableProperty] private string aiAssistantSummary = string.Empty;
     [ObservableProperty] private bool isBusy = false;
@@ -199,6 +230,8 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private string lastPdfPath = string.Empty;
     [ObservableProperty] private bool canOpenPdf = false;
     [ObservableProperty] private string currentActionName = string.Empty;
+    [ObservableProperty] private string actionSummary = string.Empty;
+    [ObservableProperty] private string initializationStatus = string.Empty;
     [ObservableProperty] private string appVersionString = string.Empty;
     
         [RelayCommand]
@@ -220,6 +253,10 @@ public partial class MainViewModel : ObservableObject
             HardwareCameras = hw.CameraDevices;
             HardwareMics = hw.Microphones;
             HardwareSerials = hw.SerialNumbers;
+            HardwareSystemDetails = hw.SystemDetails;
+            HardwareMemoryModules = hw.MemoryModules;
+            HardwareGpuDetails = hw.GpuDetails;
+            HardwareDiskHealth = hw.DiskHealth;
         }
         catch { /* ignored */ }
     }
@@ -234,8 +271,101 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private async Task StopProcessAsync(BackgroundProcessItem item)
+    {
+        if (IsActionRunning || !await _confirmationDialog.ConfirmAsync(_localization["Action.ConfirmTitle"], $"Proces '{item.Name}' stoppen? Niet-opgeslagen werk in dit programma kan verloren gaan."))
+        {
+            return;
+        }
+
+        try
+        {
+            using var process = Process.GetProcessById(item.ProcessId);
+            process.Kill(true);
+            ActionOutput = $"Proces '{item.Name}' is gestopt.";
+            UpdateProcesses();
+        }
+        catch (Exception exception)
+        {
+            ActionOutput = $"Proces kon niet worden gestopt: {exception.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private async Task ToggleStartupApplicationAsync(StartupApplicationItem item)
+    {
+        if (IsActionRunning || !await _confirmationDialog.ConfirmAsync(_localization["Action.ConfirmTitle"], $"Opstartprogramma '{item.Name}' {(item.IsEnabled ? "uitschakelen" : "inschakelen")}?"))
+        {
+            return;
+        }
+
+        const string runKeyPath = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+        const string disabledKeyPath = "Software\\Ladeco\\Diag\\DisabledStartupApps";
+        try
+        {
+            using var runKey = Registry.CurrentUser.CreateSubKey(runKeyPath, writable: true);
+            using var disabledKey = Registry.CurrentUser.CreateSubKey(disabledKeyPath, writable: true);
+            if (item.IsEnabled)
+            {
+                disabledKey.SetValue(item.Name, item.Command);
+                runKey.DeleteValue(item.Name, throwOnMissingValue: false);
+            }
+            else
+            {
+                runKey.SetValue(item.Name, item.Command);
+                disabledKey.DeleteValue(item.Name, throwOnMissingValue: false);
+            }
+
+            LoadStartupApplications();
+            ActionOutput = $"Opstartprogramma '{item.Name}' is {(item.IsEnabled ? "uitgeschakeld" : "ingeschakeld")}.";
+        }
+        catch (Exception exception)
+        {
+            ActionOutput = $"Opstartprogramma kon niet worden aangepast: {exception.Message}";
+        }
+    }
+
+    private void LoadStartupApplications()
+    {
+        const string runKeyPath = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+        const string disabledKeyPath = "Software\\Ladeco\\Diag\\DisabledStartupApps";
+        StartupApplications.Clear();
+        try
+        {
+            using var runKey = Registry.CurrentUser.OpenSubKey(runKeyPath);
+            using var disabledKey = Registry.CurrentUser.OpenSubKey(disabledKeyPath);
+            AddStartupApplications(runKey, true);
+            AddStartupApplications(disabledKey, false);
+        }
+        catch
+        {
+        }
+    }
+
+    private void AddStartupApplications(RegistryKey? key, bool isEnabled)
+    {
+        if (key is null)
+        {
+            return;
+        }
+
+        foreach (var name in key.GetValueNames())
+        {
+            if (key.GetValue(name) is string command)
+            {
+                StartupApplications.Add(new StartupApplicationItem(name, command, isEnabled, ToggleStartupApplicationCommand));
+            }
+        }
+    }
+
+    [RelayCommand]
     private async Task AppUpdateAsync()
     {
+        if (IsActionRunning)
+        {
+            return;
+        }
+
         CurrentActionName = "Controleren op updates (GitHub)...";
         IsActionRunning = true;
         IsActionOverlayVisible = true;
@@ -271,21 +401,16 @@ public partial class MainViewModel : ObservableObject
             var latestRelease = root[0]; // the newest release is traditionally first in the list
             var latestTag = latestRelease.GetProperty("tag_name").GetString()?.Replace("v", "") ?? "0.0.0";
             
-            // Extract the creation or published date of the latest release for comparison
-            DateTime onlineDate = DateTime.MinValue;
-            if (latestRelease.TryGetProperty("published_at", out var publishedAtElement))
+            var localVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+            if (!Version.TryParse(latestTag, out var onlineVersion) || localVersion is null)
             {
-                DateTime.TryParse(publishedAtElement.GetString(), out onlineDate);
+                ActionOutput += "\n\nVersie-informatie kon niet worden vergeleken.";
+                return;
             }
-            
-            ActionOutput += $"\nNieuwste versie online: {latestTag} ({onlineDate:dd/MM/yyyy HH:mm})\nHuidige versie: {AppVersionString.Replace("v", "")}";
 
-            // Check if online date is newer than local build date by scanning the local exe timestamp
-            var localExePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
-            var localCreateDate = File.GetCreationTime(localExePath);
-            
-            // If the online Github Release date is later than our local build timestamp (with a small 1 hour wiggle room for timezone differences)
-            if (onlineDate > localCreateDate.AddHours(1))
+            ActionOutput += $"\nNieuwste versie online: {onlineVersion}\nHuidige versie: {localVersion}";
+
+            if (onlineVersion > localVersion)
             {
                 ActionOutput += "\n\nNieuwe update gevonden! Downloaden...";
                 
@@ -494,12 +619,33 @@ public partial class MainViewModel : ObservableObject
     private Task RunSpeedtestAsync() => ExecuteRemediationAsync("RunSpeedtest", "Wil je een speedtest starten? Dit kan enkele seconden duren.");
 
     [RelayCommand]
+    private Task RunCpuStressTestAsync() => ExecuteRemediationAsync("RunCpuStressTest", _localization["Action.CpuStressTest"]);
+
+    [RelayCommand]
+    private Task RunGpuStressTestAsync() => ExecuteRemediationAsync("RunGpuStressTest", _localization["Action.GpuStressTest"]);
+
+    [RelayCommand]
+    private Task RunMemoryTestAsync() => ExecuteRemediationAsync("RunMemoryTest", _localization["Action.MemoryTest"]);
+
+    [RelayCommand]
+    private Task RunDiskReadTestAsync() => ExecuteRemediationAsync("RunDiskReadTest", _localization["Action.DiskReadTest"]);
+
+    [RelayCommand]
     private Task RebootSystemAsync() => ExecuteRemediationAsync("RebootSystem", _localization["Action.Reboot"]);
 
     [RelayCommand]
     private void CloseActionOverlay()
     {
         IsActionOverlayVisible = false;
+    }
+
+    [RelayCommand]
+    private void OpenActionOverlay()
+    {
+        if (IsActionRunning || !string.IsNullOrWhiteSpace(ActionOutput))
+        {
+            IsActionOverlayVisible = true;
+        }
     }
 
     [RelayCommand]
@@ -513,6 +659,11 @@ public partial class MainViewModel : ObservableObject
 
     private async Task ExecuteRemediationAsync(string actionKey, string confirmationText)
     {
+        if (IsActionRunning)
+        {
+            return;
+        }
+
         if (!await _confirmationDialog.ConfirmAsync(_localization["Action.ConfirmTitle"], confirmationText))
         {
             return;
@@ -521,14 +672,19 @@ public partial class MainViewModel : ObservableObject
         CurrentActionName = $"Actie '{actionKey}' wordt uitgevoerd...";
         IsActionRunning = true;
         IsActionOverlayVisible = true;
-        ActionOutput = $"Laden van PowerShell/Command module voor {actionKey}...";
+        ActionOutput = $"Actie '{actionKey}' wordt gestart...\n\n";
+        ActionSummary = string.Empty;
         
         _actionCts = new CancellationTokenSource();
+        var progress = new Progress<string>(chunk => ActionOutput += chunk);
         
         try
         {
-            var (success, output) = await Task.Run(() => _remediationService.RunSafeActionAsync(actionKey, _actionCts.Token), _actionCts.Token);
+            var (success, output) = await Task.Run(
+                () => _remediationService.RunSafeActionAsync(actionKey, progress, _actionCts.Token),
+                _actionCts.Token);
             ActionOutput = success ? $"{_localization["Action.Success"]}:\n{output}\n\n[VOLTOOID]" : $"{_localization["Action.Failed"]}:\n{output}\n\n[VOLTOOID MET FOUTEN]";
+            ActionSummary = BuildActionSummary(actionKey, success, output);
         }
         catch (OperationCanceledException)
         {
@@ -545,6 +701,24 @@ public partial class MainViewModel : ObservableObject
              _actionCts.Dispose();
              _actionCts = null;
         }
+    }
+
+    private static string BuildActionSummary(string actionKey, bool success, string output)
+    {
+        if (!actionKey.StartsWith("Run", StringComparison.OrdinalIgnoreCase) ||
+            !actionKey.EndsWith("Test", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Empty;
+        }
+
+        var values = Regex.Matches(output, @"\b\d{1,4}(?:[.,]\d+)?\b")
+            .Select(match => match.Value)
+            .Take(5)
+            .ToList();
+        var measurementSummary = values.Count == 0 ? "Windows heeft geen numerieke meetwaarden teruggegeven." : $"Meetwaarden: {string.Join(", ", values)}";
+        return success
+            ? $"Beoordeling: test voltooid. {measurementSummary} Bekijk de uitvoer voor de volledige Windows-resultaten."
+            : "Beoordeling: test niet volledig voltooid. Bekijk de uitvoer voor de foutmelding.";
     }
 
     private async Task RefreshRuntimeSnapshotAsync()
@@ -573,10 +747,26 @@ public partial class MainViewModel : ObservableObject
         NetworkType = snapshot.NetworkType;
         WifiSignalStrength = snapshot.WifiSignalStrength;
         NetworkSpeed = snapshot.NetworkSpeed;
+        WifiSsid = snapshot.WifiSsid;
+        WifiChannel = snapshot.WifiChannel;
+        WifiRadioType = snapshot.WifiRadioType;
+        DnsServers = snapshot.DnsServers;
         CpuName = snapshot.CpuName;
         GpuName = snapshot.GpuName;
         TotalRam = snapshot.TotalRam;
 
         UpdateProcesses();
+        await RefreshHardwareTelemetryAsync();
+    }
+
+    private async Task RefreshHardwareTelemetryAsync()
+    {
+        var telemetry = await _hardwareTelemetryProvider.GetTelemetryAsync();
+        LiveCpuTemperature = telemetry.CpuTemperature;
+        LiveCpuPower = telemetry.CpuPower;
+        LiveGpuTemperature = telemetry.GpuTemperature;
+        LiveGpuPower = telemetry.GpuPower;
+        LiveFanSpeeds = telemetry.FanSpeeds;
+        LiveStorageTemperature = telemetry.StorageTemperature;
     }
 }
